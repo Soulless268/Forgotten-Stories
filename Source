@@ -1,0 +1,720 @@
+-- Date Updated -- 7:00 PM -- 22/8/2026 -- DD/MM/YYYY
+
+local coregui = game:GetService("CoreGui")
+local players = game:GetService("Players")
+local tws = game:GetService("TweenService")
+local rs = game:GetService("RunService")
+local rp = game:GetService("ReplicatedStorage")
+local vim = game:GetService("VirtualInputManager")
+local uis = game:GetService("UserInputService")
+local gs = game:GetService("GuiService")
+
+local plr = game.Players.LocalPlayer
+local plr_mouse = plr:GetMouse()
+
+function CallModule(path)
+    local suc, mod = pcall(function()
+        local copy = path:Clone()
+        task.spawn(function()
+            repeat task.wait() until screen
+            copy.Parent = screen
+        end)
+        return require(copy)
+    end)
+    if suc then return mod end
+end
+
+--CallModule(rp.Modules.SpellLibrary)
+local spellsModule = CallModule(rp.Modules:FindFirstChild("SpellLibrary")).Spells
+
+-----Settings-----
+local Minimized = false
+local DESTROYED = false
+local enable = true
+local dodgeAssignments = {}
+local selectedSpell = {}
+local unlockedSpells = {}
+local truecolor = Color3.fromRGB(170, 170, 0)
+local falsecolor = Color3.fromRGB(163, 162, 165)
+-----Settings-----
+
+local runners = {}
+
+local function onClose()
+    enable = false
+    DESTROYED = true
+
+    for i,v in pairs(runners) do
+		if v then
+			v:Disconnect()
+		end
+	end
+
+    for i,v in pairs(dodgeAssignments) do
+		if v then
+			v:Disconnect()
+		end
+    end
+	
+	screen:Destroy()
+end
+
+local function press_key(keycode)
+	task.wait()
+	vim:SendKeyEvent(true, Enum.KeyCode[keycode], false, game)
+	task.wait(.01)
+	vim:SendKeyEvent(false, Enum.KeyCode[keycode], false, game)
+	task.wait(.05)
+end
+
+local function press_enter()
+	task.wait()
+	vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+	task.wait(.01)
+	vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+	task.wait(.05)
+end
+
+local function autoClickImage(obj, show_hb)
+    local center = obj.AbsolutePosition + obj.AbsoluteSize / 2
+    local inset = gs:GetGuiInset()
+
+    local mouseX = center.X + inset.X
+    local mouseY = center.Y + inset.Y
+
+    if show_hb then
+        local hitbox = Instance.new("Frame")
+        hitbox.Size = UDim2.fromOffset(10, 10)
+        hitbox.AnchorPoint = Vector2.new(.5,.5)
+        hitbox.Position = UDim2.fromOffset(center.X, center.Y)
+        hitbox.Parent = screen
+        game.Debris:AddItem(hitbox, 5)
+    end
+
+    vim:SendMouseButtonEvent(mouseX, mouseY, 0, true, game, 1)
+    task.wait()
+    vim:SendMouseButtonEvent(mouseX, mouseY, 0, false, game, 1)
+end
+
+local function isMouseNearImage(obj, tolerance)
+	local mousePos = uis:GetMouseLocation()
+    tolerance = tolerance or 30
+
+	local imagePos = obj.AbsolutePosition
+	local imageSize = obj.AbsoluteSize
+
+	-- Expand the image's area by the tolerance
+	local left = imagePos.X - tolerance
+	local right = imagePos.X + imageSize.X + tolerance
+	local top = imagePos.Y - tolerance
+	local bottom = imagePos.Y + imageSize.Y + tolerance
+
+	return mousePos.X >= left
+		and mousePos.X <= right
+		and mousePos.Y >= top
+		and mousePos.Y <= bottom
+end
+
+local function isMouseInImage(obj, maxDistance)
+	local mousePos = uis:GetMouseLocation()
+    maxDistance = maxDistance or (if obj.AbsoluteSize.X == obj.AbsoluteSize.Y then obj.AbsoluteSize.X else nil) or 50
+
+	local center = obj.AbsolutePosition + obj.AbsoluteSize / 2
+
+	local distance = (Vector2.new(mousePos.X, mousePos.Y) - center).Magnitude
+
+	return distance <= maxDistance
+end
+
+-----SetUp GUI-----
+screen = Instance.new("ScreenGui")
+screen.Name = "NickMainFGS"
+screen.ResetOnSpawn = false
+screen.Parent = coregui
+
+do
+	main_frame = Instance.new("Frame")
+	main_frame.Draggable = true
+	main_frame.Active = true
+	main_frame.BackgroundColor3 = Color3.fromRGB(49, 42, 39)
+	main_frame.AnchorPoint = Vector2.new(.75, 0)
+	main_frame.Position = UDim2.new(1, 0, 0, 0)
+	main_frame.Size = UDim2.new(.25,0,0.2,0)
+	main_frame.Parent = screen
+
+	do
+		local grid = Instance.new("UIGridLayout")
+		grid.Parent = main_frame
+		grid.CellPadding = UDim2.new(0,0,0,0)
+		grid.CellSize = UDim2.new(.5,0,.2,0)
+		grid.FillDirection = "Horizontal"
+		grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		grid.VerticalAlignment = Enum.VerticalAlignment.Bottom
+
+		colorstatus = Instance.new("TextButton")
+		colorstatus.Text = " "
+		colorstatus.BackgroundColor3 = enable and truecolor or falsecolor
+		colorstatus.Parent = main_frame
+
+        FullBrightMapButton = Instance.new("TextButton")
+		FullBrightMapButton.Text = "Bright Map"
+		FullBrightMapButton.Parent = main_frame
+
+        spellsButton = Instance.new("TextButton")
+		spellsButton.Text = "Select Spells"
+		spellsButton.Parent = main_frame
+
+		destroybutton = Instance.new("TextButton")
+		destroybutton.Text = "Destroy"
+		destroybutton.Parent = main_frame
+	end
+
+	spells_frame = Instance.new("Frame")
+	spells_frame.Draggable = true
+	spells_frame.Name = "Spells"
+	spells_frame.Active = true
+	spells_frame.Visible = false
+	spells_frame.BackgroundColor3 = Color3.fromRGB(49, 42, 39)
+	spells_frame.AnchorPoint = Vector2.new(0, 0)
+	spells_frame.Position = UDim2.new(0, 0, 0, 0)
+	spells_frame.Size = UDim2.new(0.2, 0, 0.4, 0)
+	spells_frame.Parent = screen
+
+	do
+
+		local scroll_frame = Instance.new("ScrollingFrame")
+		scroll_frame.Active = true
+		scroll_frame.BackgroundColor3 = Color3.fromRGB(49, 42, 39)
+		scroll_frame.Position = UDim2.new(0, 0, 0.1, 0)
+		scroll_frame.Size = UDim2.new(1,0,0.9,0)
+		scroll_frame.CanvasSize = UDim2.new(0,0,0,0)
+		scroll_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroll_frame.ScrollBarThickness = 0
+		scroll_frame.Parent = spells_frame
+
+		do
+			local grid = Instance.new("UIGridLayout")
+			grid.CellPadding = UDim2.new(0,0,0,5)
+			grid.CellSize = UDim2.new(1,0,.5,0)
+			grid.FillDirection = "Horizontal"
+			grid.SortOrder = Enum.SortOrder.LayoutOrder
+			grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			grid.VerticalAlignment = Enum.VerticalAlignment.Top
+			grid.Parent = scroll_frame
+		end
+	end
+
+end
+
+runners.runner_checkScreen = rs.RenderStepped:Connect(function(dt)
+    if not screen:IsDescendantOf(coregui) then onClose() end
+end)
+
+runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "ClickQTE" then return end
+
+    repeat task.wait() until child.Marker.Size.X.Offset <= child.Size.X.Offset
+
+    autoClickImage(child.Marker)
+
+end)
+
+runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "MeterQTE" then return end
+
+    for i = 1,10 do
+        local silder = if i == 1 then child:WaitForChild("Marker") else child:WaitForChild("Marker"..i, 1)
+        if not silder then break end
+        
+        local crit_frame = child.Critical
+
+        local center11 = silder.AbsolutePosition.X
+        local center22 = crit_frame.AbsolutePosition.X
+
+        local center1 = silder.AbsolutePosition + silder.AbsoluteSize / 2
+        local center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
+
+        repeat
+            --math.abs(ui1.AbsolutePosition.X - ui2.AbsolutePosition.X)
+            center11 = silder.AbsolutePosition.X
+            center22 = crit_frame.AbsolutePosition.X
+            
+            --(center2 - center1).Magnitude
+            center1 = silder.AbsolutePosition + silder.AbsoluteSize / 2
+            center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
+            task.wait()
+        until math.abs(center11 - center22) <= 10 or not child:IsDescendantOf(plr.PlayerGui) or not enable
+
+        center1 = silder.AbsolutePosition + silder.AbsoluteSize / 2
+        center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
+
+        print("Attack!", center11, center22, math.abs(center11 - center22))
+        autoClickImage(child)
+    end
+
+end)
+
+runners.runner_reactionQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "ReactionQTE" then return end
+
+    -- if not child.Image == "rbxassetid://88139127324893" then return end
+
+    while child:IsDescendantOf(plr.PlayerGui) do
+        repeat task.wait() until child.Image == "rbxassetid://86626625058805"
+        autoClickImage(child)
+        task.wait(.5)
+    end
+
+end)
+
+runners.runner_keyQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "KeyQte" then return end
+
+    local function rot_transform(rot)
+        return rot % 360
+    end
+
+    local spear = child.Spear
+    local ring1 = child.Ring2
+    local ring2 = child.Ring1
+
+    repeat task.wait() until ring1.ImageColor3 ~= Color3.fromRGB(255, 255, 255) and (rot_transform(ring1.Rotation) >= -10 and rot_transform(ring1.Rotation) <= 10)
+
+    autoClickImage(spear)
+
+    repeat task.wait() until ring2.ImageColor3 ~= Color3.fromRGB(85, 124, 148) and (rot_transform(ring2.Rotation) >= -10 and rot_transform(ring2.Rotation) <= 10)
+
+    autoClickImage(spear)
+
+end)
+
+runners.runner_backgroundMole = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "BackgroundMole" then return end
+
+    local inAssignment = {}
+
+    repeat
+        task.wait()
+        if not child:IsDescendantOf(plr.PlayerGui) then break end
+        for _,v in pairs(child:GetChildren()) do
+            local mole = v:FindFirstChild("Mole")
+            local spike = v:FindFirstChild("Spikeball")
+            if spike then
+                spike.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                spike.BackgroundTransparency = 0
+            elseif mole then
+                if inAssignment[mole] then continue end
+                inAssignment[mole] = true
+                autoClickImage(mole)
+                inAssignment[mole] = nil
+            else
+                v.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                v.BackgroundTransparency = 1
+            end
+        end
+    until not child:IsDescendantOf(plr.PlayerGui) or not enable
+
+    inAssignment = {}
+
+end)
+
+runners.runner_rapierQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "RapierQte" then return end
+
+    local inAssignment = {}
+
+    task.wait(.5)
+
+    for _,marker in pairs(child:GetChildren()) do
+        if inAssignment[marker] then continue end
+        inAssignment[marker] = true
+
+        autoClickImage(marker)
+        
+        task.wait(.1)
+    end
+
+    inAssignment = {}
+
+end)
+
+runners.runner_chopQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "ChopQTE" then return end
+
+    repeat
+        for _,v in pairs(child.Tree:GetChildren()) do
+            if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
+
+            if v.Position == UDim2.new(.5, 0, 1, -child.Tree.Position.Y.Offset) then
+                if v.Image == "rbxassetid://135975182333045" then
+                    if v.ImageRectSize == Vector2.new(348, 192) then --A imageRectOffset == 0
+                        press_key("A")
+                    elseif v.ImageRectSize == Vector2.new(-348, 192) then --D ImageRectOffset == 348
+                        press_key("D")
+                    end
+                elseif v.Image == "rbxassetid://99365434243772" then
+                    print("Chop top")
+                    local k = {"A", "D"}
+                    local r = k[math.random(1, #k)]
+                    press_key(r)
+                else
+                    continue
+                end
+                task.wait(.075)
+            end
+        end
+        task.wait(.5)
+    until not child:IsDescendantOf(plr.PlayerGui) or not enable
+end)
+
+runners.runner_clawHeartQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "ClawHeartQTE" then return end
+    local heart = child:WaitForChild("HeartQte")
+
+    repeat
+        local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
+        local left = heart.AbsolutePosition.X - 10
+        local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + 10
+
+        vim:SendMouseMoveEvent(left, center.Y, game)
+        task.wait(.09)
+        vim:SendMouseMoveEvent(right, center.Y, game)
+        task.wait(.09)
+    until not child:IsDescendantOf(plr.PlayerGui)
+
+end)
+
+local function makeSpellButton()
+    for _,v in pairs(plr.PlayerGui.LibraryStats.SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame:GetChildren()) do
+        if not v:IsA("Frame") then continue end
+        if table.find(unlockedSpells, v.Name) then continue end
+        table.insert(unlockedSpells, v.Name)
+    end
+
+    for _,name in pairs(unlockedSpells) do
+        if spells_frame:FindFirstChildOfClass("ScrollingFrame"):FindFirstChild(name) then continue end
+        local clone = plr.PlayerGui.LibraryStats.SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame:FindFirstChild(name):Clone()
+        clone.Name = name
+        clone.BorderMode = "Inset"
+        clone.Tittle.BorderMode = "Inset"
+        clone.Description.TextScaled = true
+        clone.EmpowerRune.Tittle.BackgroundTransparency = 1
+
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(1, 0, 1, 0)
+        button.BackgroundTransparency = 1
+		button.Parent = clone
+
+        clone.Parent = spells_frame:FindFirstChildOfClass("ScrollingFrame")
+
+        local maxRuneButton = Instance.new("TextButton")
+        maxRuneButton.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        maxRuneButton.AnchorPoint = Vector2.new(1, 1)
+        maxRuneButton.Text = "Max"
+        maxRuneButton.Name = "MaxRune"
+        maxRuneButton.TextScaled = true
+        maxRuneButton.Size = UDim2.new(.2, 0, .15, 0)
+        maxRuneButton.Position = UDim2.new(1, 0, 1, 0)
+		maxRuneButton.Parent = clone
+
+        maxRuneButton.Activated:Connect(function()
+            if not next(selectedSpell) then return end
+            if selectedSpell.Name ~= name then return end
+
+            selectedSpell.isMax = not selectedSpell.isMax
+            maxRuneButton.BackgroundColor3 = if selectedSpell.isMax then truecolor else Color3.fromRGB(0,0,0)
+
+        end)
+
+        button.Activated:Connect(function()
+            if next(selectedSpell) then
+                spells_frame:FindFirstChildOfClass("ScrollingFrame"):FindFirstChild(selectedSpell.Name).BorderColor3 = falsecolor
+                spells_frame:FindFirstChildOfClass("ScrollingFrame"):FindFirstChild(selectedSpell.Name).MaxRune.BackgroundColor3 = Color3.fromRGB(0,0,0)
+            end
+            if selectedSpell.Name == name then
+                selectedSpell = {}
+                return
+            end
+            selectedSpell = {Name = name, isMax = false}
+            spells_frame:FindFirstChildOfClass("ScrollingFrame"):FindFirstChild(selectedSpell.Name).BorderColor3 = truecolor
+        end)
+    end
+
+end
+
+makeSpellButton()
+runners.runner_checkRunes = plr.PlayerGui:WaitForChild("LibraryStats").SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame.ChildAdded:Connect(function(child)
+    makeSpellButton()
+end)
+
+runners.runner_spellRunes = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "Runesight" then return end
+
+    makeSpellButton()
+
+    if not next(selectedSpell) then
+        repeat task.wait() until next(selectedSpell) or not child:IsDescendantOf(plr.PlayerGui)
+        -- selectedSpell = unlockedSpells[math.random(1, #unlockedSpells)]
+        if not child:IsDescendantOf(plr.PlayerGui) then return end
+    end
+
+    local lists = {}
+    local howMany = 0
+
+    for _,v in pairs(child.RuneList:GetChildren()) do
+        if not v:IsA("ImageLabel") then continue end
+        howMany += 1
+    end
+
+    local function insert_spell(name, amount)
+        for i = 1,amount do
+            table.insert(lists, name)
+            howMany -= 1
+        end
+    end
+
+    if spellsModule[selectedSpell.Name] then
+        local spell = spellsModule[selectedSpell.Name]
+
+        if spell.Fire then
+            insert_spell("Fire", spell.Fire)
+        end
+
+        if spell.Water then
+            insert_spell("Water", spell.Water)
+        end
+
+        if spell.Wind then
+            insert_spell("Wind", spell.Wind)
+        end
+
+        if spell.Earth then
+            insert_spell("Earth", spell.Earth)
+        end
+
+        if spell.Chaos then
+            insert_spell("Chaos", spell.Chaos)
+        end
+
+        if spell.Void then
+            insert_spell("Void", spell.Void)
+        end
+
+        if spell.Order then
+            insert_spell("Order", spell.Order)
+        end
+    end
+
+    if howMany ~= 0 and selectedSpell.isMax then
+        if howMany > spellsModule[selectedSpell.Name].MaxIncrease then
+            insert_spell(spellsModule[selectedSpell.Name].Increase, spellsModule[selectedSpell.Name].MaxIncrease)
+        else
+            insert_spell(spellsModule[selectedSpell.Name].Increase, howMany)
+        end
+        howMany = 0
+    end
+
+    for _,rune_name in pairs(lists) do
+        local button = child.RuneInCircle:FindFirstChild(rune_name.."RuneButton")
+        if button then
+            autoClickImage(button)
+        end
+        task.wait(.5)
+    end
+
+    if not child:IsDescendantOf(plr.PlayerGui) then return end
+    if not next(lists) then return end
+    autoClickImage(child.CastButton)
+
+end)
+
+local pressing = false
+runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChild("Visuals"):GetPropertyChangedSignal("Visible"):Connect(function()
+    if not enable then return end
+    if not plr.PlayerGui.PlayerGui.Visuals.Visible then return end
+
+    local target_color_green = Color3.fromRGB(81, 237, 26)
+    local target_color_red = Color3.fromRGB(140, 30, 30)
+    
+    for _,v in pairs(plr.PlayerGui.PlayerGui.Visuals:GetChildren()) do
+        if dodgeAssignments[v] then continue end
+        local isgreen = false
+        local isred = true
+        dodgeAssignments[v] = v:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+            if not enable then return end
+            if pressing then return end
+
+            local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
+            local is_daze = daze_stat.Visible
+            local dodge_timing = if is_daze then .25 else .15
+
+            local current = v.ImageColor3
+            local distance_from_green = math.sqrt(
+                (current.R - target_color_green.R)^2 +
+                (current.G - target_color_green.G)^2 +
+                (current.B - target_color_green.B)^2
+            )
+
+            local distance_from_red = math.sqrt(
+                (current.R - target_color_red.R)^2 +
+                (current.G - target_color_red.G)^2 +
+                (current.B - target_color_red.B)^2
+            )
+
+            if distance_from_green < dodge_timing and not isgreen and isred then
+                isred = false
+                isgreen = true
+                pressing = true
+                key = v.TextLabel.Text
+                print("Dodge!", key)
+                vim:SendKeyEvent(true, Enum.KeyCode[key], false, game)
+                task.wait(.05)
+                vim:SendKeyEvent(false, Enum.KeyCode[key], false, game)
+                pressing = false
+            elseif distance_from_red < .3 and not isred and isgreen then
+                isred = true
+                isgreen = false
+            end
+        end)
+    end
+
+end)
+
+runners.runner_restrainQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "RestrainQTE" then return end
+
+    for _,v in pairs(child:GetChildren()) do
+        if not v:IsA("ImageLabel") then continue end
+
+        local key = v.Name:match("_(%a+)$")
+
+        press_key(key)
+        task.wait(.25)
+    end
+
+end)
+
+runners.runner_soulKillerHeart = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "SoulkillerHearts" then return end
+    
+    local goods = {
+        "Im breaking but im still here...";
+        "Theres still something left in me...";
+        "I know who I am.";
+        "Its not the end yet...";
+        "I must ignore those voices...";
+        "Im so tired but I cant give in...";
+    }
+
+    repeat
+        for _,v in pairs(plr.PlayerGui.PlayerGui:GetChildren()) do
+            if not v:IsA("TextLabel") then continue end
+            local text = v.Text
+            if table.find(goods, text) then
+                press_key("Space")
+            else
+                continue
+            end
+        end
+        task.wait(1)
+    until not child:IsDescendantOf(plr.PlayerGui) or not enable
+
+end)
+
+runners.runner_mining = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+
+    if child.Name ~= "RockminigameQTE" then return end
+    local CountdownLabel = child:WaitForChild("CountdownLabel")
+
+    repeat task.wait() until not CountdownLabel:IsDescendantOf(child) or CountdownLabel.TextTransparency == 1 
+
+    local rocks = {}
+    local break_rocks = {}
+
+    print("Start mining!")
+
+    local function checkStone(obj)
+        if obj.Image == "rbxassetid://85970625997038" then --break
+            autoClickImage(obj, true)
+            task.wait(.25)
+        elseif obj.Image == "rbxassetid://112215877321999" then --rocks
+            autoClickImage(obj, true)
+            task.wait(.25)
+        end
+    end
+
+    repeat
+        for _,v in pairs(child:WaitForChild("Frame"):GetChildren()) do
+            if not enable then break end
+            if not child:IsDescendantOf(plr.PlayerGui) then break end
+            if not v:IsA("ImageLabel") then continue end
+            if v:GetAttribute("IsEmpty") == true then continue end
+
+            if v.Image == "rbxassetid://85970625997038" then --break
+                rocks[v] = 1
+            elseif v.Image == "rbxassetid://112215877321999" then --rocks
+                rocks[v] = 2
+            else
+                if rocks[v] then rocks[v] = nil end
+            end
+        end
+
+        table.sort(rocks, function(a,b) return a < b end)
+
+        for i,v in pairs(rocks) do
+            if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
+            checkStone(i)
+            checkStone(i)
+        end
+
+        task.wait()
+    until not child:IsDescendantOf(plr.PlayerGui)
+
+end)
+
+colorstatus.Activated:Connect(function()
+    enable = not enable
+    colorstatus.BackgroundColor3 = if enable then truecolor else falsecolor
+end)
+
+FullBrightMapButton.Activated:Connect(function()
+    for _,v in pairs(workspace.WorldMap:GetDescendants()) do
+        if v:IsA("SpotLight") then
+            v.Angle = 180
+            v.Brightness = 50
+        else
+            continue
+        end
+    end
+end)
+
+spellsButton.Activated:Connect(function()
+    spells_frame.Visible = not spells_frame.Visible
+end)
+
+destroybutton.MouseButton1Down:Connect(function()
+    onClose()
+end)
+
+runners.runner_input = uis.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton3 then
+		enable = not enable
+        colorstatus.BackgroundColor3 = if enable then truecolor else falsecolor
+	elseif input.KeyCode == Enum.KeyCode.KeypadPlus then
+		screen.Enabled = not screen.Enabled
+	end
+end)
