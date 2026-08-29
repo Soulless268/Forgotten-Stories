@@ -1,4 +1,4 @@
--- Date Updated -- 7:00 PM -- 22/8/2026 -- DD/MM/YYYY
+-- Date Updated -- 4:00 AM -- 30/8/2026 -- DD/MM/YYYY
 -- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Handmade_Scripts/refs/heads/main/Lua/Games/Forgotten_Stories"),true))()
 
 local coregui = game:GetService("CoreGui")
