@@ -1,5 +1,5 @@
--- Date Updated -- 4:00 AM -- 30/8/2026 -- DD/MM/YYYY
--- -- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Forgotten-Stories/refs/heads/main/Source"),true))()
+-- Date Updated -- 3:40 PM -- 30/8/2026 -- DD/MM/YYYY
+-- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Forgotten-Stories/refs/heads/main/Source"),true))()
 
 local coregui = game:GetService("CoreGui")
 local players = game:GetService("Players")
@@ -36,9 +36,10 @@ local spellsModule = CallModule(rp.Modules:FindFirstChild("SpellLibrary")).Spell
 -----Settings-----
 configs = {
     normalDodgeDelay = 0;
-    dazeDodgeDelay = 0.3;
+    dazeDodgeDelay = 0.1;
     dodgeType = "ArrowSize"; -- ArrowSize, ArrowColor
     meterQTEExtraPixel = 1;
+    clickQTETolerance = 25;
     clawQTESpeed = 0.01;
 }
 defaults_cofigs = table.clone(configs)
@@ -118,6 +119,7 @@ function reset_settings()
     DazeDodgeDelayButton.Text = configs.dazeDodgeDelay
     DodgeTypeButton.Text = configs.dodgeType
     MeterQTEExtraPixelButton.Text = configs.meterQTEExtraPixel
+    ClickQTEToleranceButton.Text = configs.clickQTETolerance
     ClawQTESpeedButton.Text = configs.clawQTESpeed
 end
 
@@ -245,18 +247,29 @@ local function track_animation(model)
     local animator = humanoid:WaitForChild("Animator", 2)
 
     if not humanoid then return end
+    
+    local target_name = {
+        Hit = "F";
+        Parry = "F";
+        Left = "A";
+        Right = "D";
+        Jump = "Space";
+        Down = "S";
+    }
 
     animationTracked[model] = animator.AnimationPlayed:Connect(function(track)
         local animation = track.Animation
         logs(`Animation started!`)
-        logs(`Track Name: {animation.Name}`)
-        logs(`Track ID: {animation.AnimationId}`)
+        logs(`Track Name: {animation.Name}`, true)
+        logs(`Track ID: {animation.AnimationId}`, true)
 
         local sequence = game:GetService("KeyframeSequenceProvider"):GetKeyframeSequenceAsync(animation.AnimationId)
+        local current_have = {}
 
         for _, keyframe in ipairs(sequence:GetKeyframes()) do
             for _, marker in ipairs(keyframe:GetMarkers()) do
                 local markerName = marker.Name
+                if target_name[markerName] then current_have[markerName] = true else continue end
 
                 if not animationTracked[track] then
                     animationTracked[track] = track:GetMarkerReachedSignal(markerName):Connect(function(value)
@@ -438,6 +451,8 @@ do
 
             ResetSettingsButton = gui_module.create_frame(settings_frame, "Reset Setting", "Reset the setting to original settings", "Click")
 
+            ClickQTEToleranceButton = gui_module.create_frame(settings_frame, "Click QTE tolerance", "how far the Marker reach before click", configs.clickQTETolerance)
+
             MeterQTEExtraPixelButton = gui_module.create_frame(settings_frame, "QTE extra pixel", "Extra pixel for Slash QTE", configs.meterQTEExtraPixel)
 
             ClawQTESpeedButton = gui_module.create_frame(settings_frame, "Claw QTE speed", "how fast can the auto mouse move", configs.clawQTESpeed)
@@ -609,12 +624,18 @@ end)
 
 runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
     if not enable then return end
-    if child.Name ~= "ClickQTE" then return end
 
-    repeat task.wait() until child.Marker.Size.X.Offset <= child.Size.X.Offset
-
-    autoClickImage(child.Marker)
-
+    if child.Name == "ClickQTE" then
+        repeat task.wait() until child.Marker.Size.X.Offset <= child.Size.X.Offset - configs.clickQTETolerance
+        autoClickImage(child.Marker)
+    elseif child.Name == "ClickQTE_1" then
+        for i = 1,10 do
+            local current = plr.PlayerGui.PlayerGui:WaitForChild(`ClickQTE_{i}`, 1)
+            if not current then continue end
+            repeat task.wait() until current.Marker.Size.X.Offset <= current.Size.X.Offset - configs.clickQTETolerance
+            autoClickImage(current.Marker)
+        end
+    end
 end)
 
 runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
@@ -1161,7 +1182,7 @@ FullBrightMapButton.Activated:Connect(function()
         local tile_name = workspace.WorldInfo.Tile.Value
         local biome = workspace.WorldInfo.CurrentBiome.Value
         local current_tile
-        if biome == "Caves" then
+        if biome == "Caves" or biome == "CrystalRift" then
             current_tile = workspace.WorldMap:FindFirstChild(`Cave_{tile_name}`)
         else
             current_tile = workspace.WorldMap:FindFirstChild(tile_name)
@@ -1191,6 +1212,12 @@ end)
 MeterQTEExtraPixelButton.FocusLost:Connect(function()
     if typeof(tonumber(MeterQTEExtraPixelButton.Text)) == "number" then
         configs.meterQTEExtraPixel = tonumber(MeterQTEExtraPixelButton.Text)
+    end
+end)
+
+clickQTETolerance.FocusLost:Connect(function()
+    if typeof(tonumber(clickQTETolerance.Text)) == "number" then
+        configs.clickQTETolerance = tonumber(clickQTETolerance.Text)
     end
 end)
 
