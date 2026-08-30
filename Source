@@ -145,6 +145,9 @@ local function load_setting()
 					if value == defaultValue then
                         logs(`UnChange | {key} | {value} | {typeof(value)}`)
                         configs[key] = defaultValue
+                    elseif value == nil and defaultValue ~= nil then
+                        logs(`Table not exist | {key} | {value} | {typeof(value)}`)
+                        continue
 					else
                         logs(`Change | {key} | {value} | {typeof(value)}`)
                         configs[key] = value
@@ -1215,9 +1218,9 @@ MeterQTEExtraPixelButton.FocusLost:Connect(function()
     end
 end)
 
-clickQTETolerance.FocusLost:Connect(function()
-    if typeof(tonumber(clickQTETolerance.Text)) == "number" then
-        configs.clickQTETolerance = tonumber(clickQTETolerance.Text)
+ClickQTEToleranceButton.FocusLost:Connect(function()
+    if typeof(tonumber(ClickQTEToleranceButton.Text)) == "number" then
+        configs.clickQTETolerance = tonumber(ClickQTEToleranceButton.Text)
     end
 end)
 
