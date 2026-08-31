@@ -1,4 +1,4 @@
--- Date Updated -- 3:40 PM -- 30/8/2026 -- DD/MM/YYYY
+-- Date Updated -- 7:00 AM -- 31/8/2026 -- DD/MM/YYYY
 -- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Forgotten-Stories/refs/heads/main/Source"),true))()
 
 local coregui = game:GetService("CoreGui")
@@ -651,18 +651,18 @@ runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Con
         
         local crit_frame = child.Critical
 
-        local center1 = slider.AbsolutePosition.X
-        local center2 = crit_frame.AbsolutePosition.X
+        local center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
+        local center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
 
         local runner
         runner = slider:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
             if not enable then if runner then runner:Disconnect() return end end
             if not child:IsDescendantOf(plr.PlayerGui) then if runner then runner:Disconnect() return end end
 
-            center1 = slider.AbsolutePosition.X
-            center2 = crit_frame.AbsolutePosition.X
+            center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
+            center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
 
-            if math.abs(center1 - center2) <= crit_frame.AbsoluteSize.X/2 +configs.meterQTEExtraPixel then -- 5?
+            if math.abs(center1.X - center2.X) <= crit_frame.AbsoluteSize.X/2 +configs.meterQTEExtraPixel then -- 5?
                 logs(`Attack! {center1} {center2} {math.abs(center1 - center2)}`)
                 autoClickImage(child)
                 if runner then runner:Disconnect() end
@@ -670,6 +670,13 @@ runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Con
         end)
     end
 
+end)
+
+runners.runner_arrowQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+    if not enable then return end
+    if child.Name ~= "BullseyeBase" then return end
+    task.wait(.5)
+    autoClickImage(child)
 end)
 
 runners.runner_reactionQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
@@ -836,8 +843,8 @@ runners.runner_clawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").Child
 
     repeat
         local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
-        local left = heart.AbsolutePosition.X - clawQTEDistanceTolerance
-        local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + clawQTEDistanceTolerance
+        local left = heart.AbsolutePosition.X - (heart.AbsoluteSize.X/2) - clawQTEDistanceTolerance
+        local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X - clawQTEDistanceTolerance
 
         if Logs then
             local hitbox = Instance.new("Frame")
@@ -856,7 +863,7 @@ runners.runner_clawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").Child
         task.wait(configs.clawQTESpeed)
     until not child:IsDescendantOf(plr.PlayerGui)
 
-    logs(`End in {time()-start_t} second`)
+    logs(`Claw Spike QTE End in {time()-start_t} second`)
 
 end)
 
@@ -867,13 +874,21 @@ runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").
     local inset = gs:GetGuiInset()
     local start_t = time()
 
+    local function get_heart(number)
+        local heart = child:FindFirstChild(`Heart_{number}`)
+        if heart and heart:FindFirstChild("HeartHealth").Text == "0" then
+            number = number+1
+            heart, number = get_heart(number)
+        end
+        return heart, number
+    end
+
     for i = 1,10 do
-        local heart = child:FindFirstChild("Heart_" .. i)
-        local heart2 = child:FindFirstChild("Heart_" .. (i + 1))
-        
-        heart = heart and heart.HeartHealth.Text ~= "0" and heart or nil
-        heart2 = heart2 and heart2.HeartHealth.Text ~= "0" and heart2 or nil
+        local heart, n = get_heart(i)
+        local heart2 = get_heart(n+1)
         if not heart then continue end
+
+        logs(`Heart1: {heart} | Heart2: {heart2}`)
 
         repeat
             local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
@@ -881,8 +896,10 @@ runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").
             local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + clawQTEDistanceTolerance
             local left2
             local right2
+            local center2
 
             if heart2 then
+                center2 = heart2.AbsolutePosition + heart2.AbsoluteSize / 2
                 left2 = heart2.AbsolutePosition.X - clawQTEDistanceTolerance
                 right2 = heart2.AbsolutePosition.X + heart2.AbsoluteSize.X + clawQTEDistanceTolerance
             end
@@ -896,14 +913,14 @@ runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").
                 game.Debris:AddItem(hitbox, 2)
             end
 
-            vim:SendMouseMoveEvent(left, center.Y+inset.Y, game)
+            vim:SendMouseMoveEvent(center.X, center.Y+inset.Y, game)
             task.wait(configs.clawQTESpeed)
-            if heart2 then vim:SendMouseMoveEvent(right2, center.Y+inset.Y, game) else vim:SendMouseMoveEvent(right, center.Y+inset.Y, game) end
+            if heart2 then vim:SendMouseMoveEvent(center2.X, center2.Y+inset.Y, game) else vim:SendMouseMoveEvent(right, center.Y+inset.Y, game) end
             task.wait(configs.clawQTESpeed)
         until not child:IsDescendantOf(plr.PlayerGui) or not heart:IsDescendantOf(plr.PlayerGui) or heart.HeartHealth.Text == "0"
     end
 
-    logs(`End in {time()-start_t} second`)
+    logs(`Multi Claw QTE End in {time()-start_t} second`)
 
 end)
 
@@ -1005,35 +1022,20 @@ runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChi
     local target_color_red = Color3.fromRGB(140, 30, 30)
     
     for _,v in pairs(plr.PlayerGui.PlayerGui.Visuals:GetChildren()) do
-        if dodgeAssignments[v] then continue end
-        local isgreen = false
-        local isred = true
-        local isbig = false
-        local issmall = true
-        dodgeAssignments[v] = v:GetPropertyChangedSignal("Size"):Connect(function()
-            if not enable then return end
-            if pressing then return end
-            
-            local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
-            local is_daze = daze_stat.Visible
-            local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+        if not dodgeAssignments[`{v.Name}Size`] then
+            local isbig = false
+            local issmall = true
+            dodgeAssignments[`{v.Name}Size`] = v:GetPropertyChangedSignal("Size"):Connect(function()
+                if not enable then return end
+                if pressing then return end
+                if not configs.dodgeType == "ArrowSize" then return end
                 
-            local scale = (v.Size.X.Scale + v.Size.Y.Scale) / 2
+                local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
+                local is_daze = daze_stat.Visible
+                local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+                    
+                local scale = (v.Size.X.Scale + v.Size.Y.Scale) / 2
 
-            local current = v.ImageColor3
-            local distance_from_green = math.sqrt(
-                (current.R - target_color_green.R)^2 +
-                (current.G - target_color_green.G)^2 +
-                (current.B - target_color_green.B)^2
-            )
-
-            local distance_from_red = math.sqrt(
-                (current.R - target_color_red.R)^2 +
-                (current.G - target_color_red.G)^2 +
-                (current.B - target_color_red.B)^2
-            )
-
-            if configs.dodgeType == "ArrowSize" then
                 if scale >= 1.25 and issmall then
                     isbig = true
                     issmall = false
@@ -1048,7 +1050,32 @@ runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChi
                     issmall = true
                     isbig = false
                 end
-            elseif configs.dodgeType == "ArrowColor" then
+            end)
+        elseif not dodgeAssignments[`{v.Name}Color`] then
+            local isgreen = false
+            local isred = true
+            dodgeAssignments[`{v.Name}Color`] = v:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+                if not enable then return end
+                if pressing then return end
+                if not configs.dodgeType == "ArrowColor" then return end
+                
+                local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
+                local is_daze = daze_stat.Visible
+                local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+
+                local current = v.ImageColor3
+                local distance_from_green = math.sqrt(
+                    (current.R - target_color_green.R)^2 +
+                    (current.G - target_color_green.G)^2 +
+                    (current.B - target_color_green.B)^2
+                )
+
+                local distance_from_red = math.sqrt(
+                    (current.R - target_color_red.R)^2 +
+                    (current.G - target_color_red.G)^2 +
+                    (current.B - target_color_red.B)^2
+                )
+
                 if distance_from_green < dodge_timing and not isgreen and isred then
                     isred = false
                     isgreen = true
@@ -1056,16 +1083,16 @@ runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChi
                     key = v.TextLabel.Text
                     if is_daze then task.wait(configs.dazeDodgeDelay) else task.wait(configs.normalDodgeDelay) end
                     logs(`Dodge! {key}`)
-                    vim:SendKeyEvent(true, Enum.KeyCode[key], false, game)
-                    task.wait(.05)
-                    vim:SendKeyEvent(false, Enum.KeyCode[key], false, game)
+                    press_key(key)
                     pressing = false
                 elseif distance_from_red < .3 and not isred and isgreen then
                     isred = true
                     isgreen = false
                 end
-            end
-        end)
+            end)
+        else
+            continue
+        end
     end
 
 end)
@@ -1204,6 +1231,7 @@ FullBrightMapButton.Activated:Connect(function()
         end)
     else
         if runners.runner_BM then runners.runner_BM:Disconnect() end
+        if runners.runner_BM_2 then runners.runner_BM_2:Disconnect() end
         sl.Parent = nil
     end
 end)
