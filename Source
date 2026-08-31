@@ -1,4 +1,4 @@
--- Date Updated -- 7:00 AM -- 31/8/2026 -- DD/MM/YYYY
+-- Date Updated -- 8:45 PM -- 31/8/2026 -- DD/MM/YYYY
 -- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Forgotten-Stories/refs/heads/main/Source"),true))()
 
 local coregui = game:GetService("CoreGui")
@@ -31,6 +31,8 @@ end
 --CallModule(rp.Modules.SpellLibrary)
 local gui_module = loadstring(game:HttpGet("https://raw.githubusercontent.com/Soulless268/Handmade_Scripts/refs/heads/main/Lua/Modules/GUI_Module"))()
 
+local achievementLibraryModule = CallModule(rp.Modules:FindFirstChild("AchievementLibrary")).Achievements
+local libraryModule = CallModule(rp.Modules:FindFirstChild("Library")).Content
 local spellsModule = CallModule(rp.Modules:FindFirstChild("SpellLibrary")).Spells
 
 -----Settings-----
@@ -51,6 +53,7 @@ local Minimized = false
 local DESTROYED = false
 local enable = true
 local enableBM = false
+local showLibrary = true
 local clawQTEDistanceTolerance = 0
 local sl
 local dodgeTypes = {
@@ -101,6 +104,12 @@ local function logs(text, w)
     else 
         print(text)
     end
+end
+
+local function getMousePosition()
+	local mouse = plr_mouse
+	local x, y = mouse.X, mouse.Y
+	return x, y
 end
 
 function update_setting()
@@ -191,6 +200,10 @@ local function press_enter()
 	task.wait(.01)
 	vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
 	task.wait(.05)
+end
+
+local function showHover()
+
 end
 
 local function autoClickImage(obj)
@@ -348,6 +361,70 @@ local function makeSpellButton()
 
 end
 
+local function showUnlockedLibaryRequire()
+    if not showLibrary then return end
+    local path = plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame
+
+    for name,v in pairs(libraryModule) do
+        if path:FindFirstChild(`{name}_Holder`) then path:FindFirstChild(`{name}_Holder`):Destroy() end
+        if path:FindFirstChild(name) then continue end
+        if not rp.PreMades.Books:FindFirstChild(name) then continue end
+        local book_image = v.Illustration --v.ImageId in AchievementLibrary Module
+        local requirements_text = if achievementLibraryModule[name] then achievementLibraryModule[name].Text else nil
+        local requirements = v.Requirements
+        local auto_progress = v.AutoProgress
+
+        local remain_requirements = table.clone(requirements)
+        if auto_progress then
+            for i,vv in pairs(auto_progress) do
+                remain_requirements[i] -= vv
+                if remain_requirements[i] == 0 then remain_requirements[i] = nil end
+            end
+            if not next(remain_requirements) then remain_requirements = nil end
+        else
+            remain_requirements = "Unlock on joining game"
+        end
+
+        local function formatRequirements(tabl)
+            if typeof(tabl) == "string" then return tabl end
+            local parts = {}
+            for i, amount in pairs(tabl) do
+                table.insert(parts, `{i} = {amount}`)
+            end
+            return table.concat(parts, ", ")
+        end
+
+        local clone = rp.PreMades.Books[name]:Clone()
+        clone.Name = `{name}_Holder`
+        clone.LayoutOrder = 1
+        clone.HoverImage = book_image
+        clone.Image = book_image
+        clone.ImageColor3 = Color3.fromRGB(100,100,100)
+        clone.Visible = true
+        clone.Parent = path
+
+        if name == "True Strength" and not requirements_text then
+            requirements_text = achievementLibraryModule["True Strenght"].Text
+        end
+
+        if not requirements_text then logs(`{name} dont have table. or is it error?`, true) end
+
+        runners[`HoverEnter_{name}`] = clone.MouseEnter:Connect(function()
+            HoverFrame:FindFirstChild("Title").Text = name
+            HoverFrame:FindFirstChild("Text1").Text = `Requirements: {formatRequirements(requirements_text or requirements)}`
+            HoverFrame:FindFirstChild("Text2").Text = `Unlocked Requirements: {formatRequirements(remain_requirements)}`
+
+            HoverFrame.Visible = true
+            logs("Button is being hovered!")
+        end)
+
+        runners[`HoverLeave_{name}`] = clone.MouseLeave:Connect(function()
+            HoverFrame.Visible = false
+            logs("Mouse left the button.")
+        end)
+    end
+end
+
 -----SetUp GUI-----
 screen = Instance.new("ScreenGui")
 screen.Name = "NickMainFGS"
@@ -425,6 +502,8 @@ do
             SpellsButton = gui_module.create_frame(control_frame, "Show Spell", "Show the spell you currently have, click it to auto use", "Click")
 
             FullBrightMapButton = gui_module.create_frame(control_frame, "Map Fullbright", "Light up the map", enableBM)
+
+            ShowLibraryButton = gui_module.create_frame(control_frame, "Show Library", "show every book in library and hint on hover", showLibrary)
 
 		end
 
@@ -507,15 +586,8 @@ do
 
             local stext_ = {
                 "CURRENT UPDATE";
-                "New UI";
-                "New save settings";
-                "Improve Meter/Sword QTE and Claw QTE";
-                "ClawHeartSpikeQTE are currently disable right now";
-                "Mining now wait for the time is start";
-                "Improve Dodge QTE";
-                "Fix Full bright map not working sometimes";
-                "Make it more Customizable";
-
+                "Add hover frame";
+                "Add Library hint";
             }
 
             local text_1 = Instance.new("TextLabel")
@@ -602,6 +674,55 @@ do
 		end
 	end
 
+    HoverFrame = Instance.new("Frame")
+	HoverFrame.Name = "Hover"
+	HoverFrame.Active = true
+	HoverFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	HoverFrame.AnchorPoint = Vector2.new(0, 0)
+	HoverFrame.Position = UDim2.new(0, 0, 0.15, 0)
+	HoverFrame.Size = UDim2.new(0.25, 0, 0.2, 0)
+	HoverFrame.Parent = screen
+    HoverFrame.Visible = false
+	gui_module.UiStroke(HoverFrame)
+
+    do
+
+        local list = Instance.new("UIListLayout")
+        list.Padding = UDim.new(0,0)
+        list.FillDirection = "Vertical"
+        list.SortOrder = "LayoutOrder"
+        list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        list.VerticalAlignment = Enum.VerticalAlignment.Top
+        list.Parent = HoverFrame
+
+        local title = Instance.new("TextLabel")
+        title.Name = "Title"
+        title.Text = " "
+        title.Size = UDim2.new(1,0,.1,0)
+        title.TextColor3 = Color3.fromRGB(255,255,255)
+        title.BackgroundTransparency = 1
+        title.TextScaled = true
+        title.Parent = HoverFrame
+
+        local text_1 = Instance.new("TextLabel")
+        text_1.Name = "Text1"
+        text_1.Text = " "
+        text_1.Size = UDim2.new(1,0,.45,0)
+        text_1.TextColor3 = Color3.fromRGB(255,255,255)
+        text_1.BackgroundTransparency = 1
+        text_1.TextScaled = true
+        text_1.Parent = HoverFrame
+
+        local text_2 = Instance.new("TextLabel")
+        text_2.Name = "Text2"
+        text_2.Text = " "
+        text_2.Size = UDim2.new(1,0,.45,0)
+        text_2.TextColor3 = Color3.fromRGB(255,255,255)
+        text_2.BackgroundTransparency = 1
+        text_2.TextScaled = true
+        text_2.Parent = HoverFrame
+    end
+
 	ShowButton = Instance.new("TextButton")
 	ShowButton.Active = true
 	ShowButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -615,7 +736,8 @@ do
 end
 
 --Startup
-makeSpellButton()
+task.spawn(makeSpellButton)
+task.spawn(showUnlockedLibaryRequire)
 
 for _,v in pairs(workspace.Enemies:GetChildren()) do
     track_animation(v)
@@ -624,6 +746,8 @@ end
 runners.runner_checkScreen = rs.RenderStepped:Connect(function(dt)
     if not screen:IsDescendantOf(coregui) then onClose() end
 end)
+
+logs("active emergency close")
 
 runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
     if not enable then return end
@@ -924,6 +1048,13 @@ runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").
 
 end)
 
+runners.runner_checkNew = plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame.ChildAdded:Connect(function(child)
+    if not plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`)  then return end
+    if runners[`HoverEnter_{child.Name}`] then runners[`HoverEnter_{child.Name}`]:Disconnect() end
+    if runners[`HoverLeave_{child.Name}`] then runners[`HoverLeave_{child.Name}`]:Disconnect() end
+    plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`):Destroy()
+end)
+
 runners.runner_checkRunes = plr.PlayerGui:WaitForChild("LibraryStats").SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame.ChildAdded:Connect(function(child)
     makeSpellButton()
 end)
@@ -1194,6 +1325,10 @@ runners.runner_mining = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Conne
 
 end)
 
+runners.runner_workspace = workspace.ChildAdded:Connect(function(child)
+    if child.Name == "RootVFX" then track_animation(child) end
+end)
+
 runners.runner_logsTrackAnimation = workspace.Enemies.ChildAdded:Connect(function(child)
     if not child:FindFirstChildOfClass("Humanoid") then return end
     track_animation(child)
@@ -1202,6 +1337,20 @@ end)
 colorstatus.Activated:Connect(function()
     enable = not enable
     colorstatus.BackgroundColor3 = if enable then truecolor else falsecolor
+end)
+
+ShowLibraryButton.Activated:Connect(function()
+    showLibrary = not showLibrary
+    ShowLibraryButton.BackgroundColor3 = if showLibrary then truecolor else falsecolor
+
+    if showLibrary then
+        task.spawn(showUnlockedLibaryRequire)
+    else
+        for _,v in plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:GetChildren() do
+            if string.sub(v.Name, -7) == "_Holder" then v:Destroy() end
+        end
+    end
+
 end)
 
 FullBrightMapButton.Activated:Connect(function()
@@ -1330,6 +1479,13 @@ end)
 players.PlayerRemoving:Connect(function(player)
     if player ~= plr then return end
     update_setting()
+end)
+
+runners.runner_hover = plr_mouse.Move:Connect(function()
+	task.spawn(function()
+		local x,y = getMousePosition()
+		HoverFrame.Position = UDim2.new(0, x, 0, y)
+	end)
 end)
 
 runners.runner_input = uis.InputBegan:Connect(function(input, gpe)
