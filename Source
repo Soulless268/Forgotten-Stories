@@ -1,4 +1,4 @@
--- Date Updated -- 2:10 AM -- 4/9/2026 -- DD/MM/YYYY
+-- Date Updated -- 2:30 AM -- 4/9/2026 -- DD/MM/YYYY
 -- loadstring(game:HttpGet(("https://raw.githubusercontent.com/Soulless268/Forgotten-Stories/refs/heads/main/Source"),true))()
 
 local coregui = game:GetService("CoreGui")
@@ -57,7 +57,6 @@ local showLibrary = true
 local clawQTEDistanceTolerance = 0
 local sl
 local dodgeTypes = {
-	"AnimationTrack",
 	"ArrowSize",
 	"ArrowColor",
 }
@@ -843,14 +842,6 @@ if not isMainLobby then
     end
 end
 
-if configs.dodgeType == "AnimationTrack" then
-    DodgeInAdvanceButton.Visible = true
-    NormalDodgeDelayButton.Visible = false
-else
-    DodgeInAdvanceButton.Visible = false
-    NormalDodgeDelayButton.Visible = true
-end
-
 if not isMainLobby then
     runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
         if not enable then return end
@@ -1436,6 +1427,7 @@ end
 runners.runner_workspace = workspace.ChildAdded:Connect(function(child)
     if child.Name == "RootVFX" then task.spawn(track_animation, child) end
     if child.Name == "TectonicCall" then task.spawn(track_animation, child) end
+    if child.Name == "Afterimage" then return end
     logs(child.Name)
 end)
 
@@ -1530,17 +1522,10 @@ clawQTEDistanceToleranceButton.FocusLost:Connect(function()
 end)
 
 DodgeTypeButton.Activated:Connect(function()
-    local current = table.find(dodgeTypes, configs.dodgeType)
+    local current = table.find(dodgeTypes, configs.dodgeType) or 1
     configs.dodgeType = dodgeTypes[(current % #dodgeTypes) + 1]
 	DodgeTypeButton.Text = configs.dodgeType
 
-    if configs.dodgeType == "AnimationTrack" then
-        DodgeInAdvanceButton.Visible = true
-        NormalDodgeDelayButton.Visible = false
-    else
-        DodgeInAdvanceButton.Visible = false
-        NormalDodgeDelayButton.Visible = true
-    end
 end)
 
 DevModeButton.Activated:Connect(function()
