@@ -15,6 +15,7 @@ local plr = game.Players.LocalPlayer
 local plr_mouse = plr:GetMouse()
 
 local file_path = "NickHub/FORGOTTEN_STORIES.nh"
+local isMainLobby = if game.PlaceId == 91220286841086 then true else false
 
 function CallModule(path)
     local suc, mod = pcall(function()
@@ -25,10 +26,9 @@ function CallModule(path)
         end)
         return require(copy)
     end)
-    if suc then return mod end
+    if suc then return mod else return {} end
 end
 
---CallModule(rp.Modules.SpellLibrary)
 local gui_module = loadstring(game:HttpGet("https://raw.githubusercontent.com/Soulless268/Handmade_Scripts/refs/heads/main/Lua/Modules/GUI_Module"))()
 
 local achievementLibraryModule = CallModule(rp.Modules:FindFirstChild("AchievementLibrary")).Achievements
@@ -57,7 +57,7 @@ local showLibrary = true
 local clawQTEDistanceTolerance = 0
 local sl
 local dodgeTypes = {
-	-- "AnimationTrack",
+	"AnimationTrack",
 	"ArrowSize",
 	"ArrowColor",
 }
@@ -186,10 +186,10 @@ local function load_setting()
 
 end
 
-local function press_key(keycode)
+local function press_key(keycode, hold)
 	task.wait()
 	vim:SendKeyEvent(true, Enum.KeyCode[keycode], false, game)
-	task.wait(.01)
+	task.wait(hold or .01)
 	vim:SendKeyEvent(false, Enum.KeyCode[keycode], false, game)
 	task.wait(.05)
 end
@@ -304,6 +304,7 @@ end
 
 --Preload InGame Function:
 local function makeSpellButton()
+    if isMainLobby then return end
     for _,v in pairs(plr.PlayerGui.LibraryStats.SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame:GetChildren()) do
         if not v:IsA("Frame") then continue end
         if table.find(unlockedSpells, v.Name) then continue end
@@ -362,66 +363,121 @@ local function makeSpellButton()
 end
 
 local function showUnlockedLibaryRequire()
-    if not showLibrary then return end
     local path = plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame
 
-    for name,v in pairs(libraryModule) do
-        if path:FindFirstChild(`{name}_Holder`) then path:FindFirstChild(`{name}_Holder`):Destroy() end
-        if path:FindFirstChild(name) then continue end
-        if not rp.PreMades.Books:FindFirstChild(name) then continue end
-        local book_image = v.Illustration --v.ImageId in AchievementLibrary Module
-        local requirements_text = if achievementLibraryModule[name] then achievementLibraryModule[name].Text else nil
-        local requirements = v.Requirements
-        local auto_progress = v.AutoProgress
-
-        local remain_requirements = table.clone(requirements)
-        if auto_progress then
-            for i,vv in pairs(auto_progress) do
-                remain_requirements[i] -= vv
-                if remain_requirements[i] == 0 then remain_requirements[i] = nil end
+    if not showLibrary then
+        if isMainLobby then
+            for _,v in path:GetChildren() do
+                if runners[`HoverEnter_{v.Name}`] then runners[`HoverEnter_{v.Name}`]:Disconnect() end
+                if runners[`HoverLeave_{v.Name}`] then runners[`HoverLeave_{v.Name}`]:Disconnect() end
+                if not v:GetAttribute("Locked") then continue end
+                if v:FindFirstChild("Written") then v:FindFirstChild("Written").Image = "rbxassetid://129898648862943" end
+                if v:FindFirstChild("Written") then v:FindFirstChild("Written").ImageColor3 = Color3.fromRGB(255,255,255) end
             end
-            if not next(remain_requirements) then remain_requirements = nil end
         else
-            remain_requirements = "Unlock on joining game"
-        end
-
-        local function formatRequirements(tabl)
-            if typeof(tabl) == "string" then return tabl end
-            local parts = {}
-            for i, amount in pairs(tabl) do
-                table.insert(parts, `{i} = {amount}`)
+            for _,v in path:GetChildren() do
+                if string.sub(v.Name, -7) == "_Holder" then v:Destroy() end
+                if runners[`HoverEnter_{v.Name}`] then runners[`HoverEnter_{v.Name}`]:Disconnect() end
+                if runners[`HoverLeave_{v.Name}`] then runners[`HoverLeave_{v.Name}`]:Disconnect() end
             end
-            return table.concat(parts, ", ")
         end
+        return
+    end
 
-        local clone = rp.PreMades.Books[name]:Clone()
-        clone.Name = `{name}_Holder`
-        clone.LayoutOrder = 1
-        clone.HoverImage = book_image
-        clone.Image = book_image
-        clone.ImageColor3 = Color3.fromRGB(100,100,100)
-        clone.Visible = true
-        clone.Parent = path
+    if not isMainLobby then
+        for name,v in pairs(libraryModule) do
+            if path:FindFirstChild(`{name}_Holder`) then path:FindFirstChild(`{name}_Holder`):Destroy() end
+            if path:FindFirstChild(name) then continue end
+            if not rp.PreMades.Books:FindFirstChild(name) then continue end
+            local book_image = v.Illustration --v.ImageId in AchievementLibrary Module
+            local requirements_text = if achievementLibraryModule[name] then achievementLibraryModule[name].Text else nil
+            local requirements = v.Requirements
+            local auto_progress = v.AutoProgress
 
-        if name == "True Strength" and not requirements_text then
-            requirements_text = achievementLibraryModule["True Strenght"].Text
+            local remain_requirements = table.clone(requirements)
+            if auto_progress then
+                for i,vv in pairs(auto_progress) do
+                    remain_requirements[i] -= vv
+                    if remain_requirements[i] == 0 then remain_requirements[i] = nil end
+                end
+                if not next(remain_requirements) then remain_requirements = nil end
+            else
+                remain_requirements = "Unlocked on spawn"
+            end
+
+            local function formatRequirements(tabl)
+                if typeof(tabl) == "string" then return tabl end
+                local parts = {}
+                for i, amount in pairs(tabl) do
+                    table.insert(parts, `{i} = {amount}`)
+                end
+                return table.concat(parts, ", ")
+            end
+
+            local clone = rp.PreMades.Books[name]:Clone()
+            clone.Name = `{name}_Holder`
+            clone.LayoutOrder = 1
+            clone.HoverImage = book_image
+            clone.Image = book_image
+            clone.ImageColor3 = Color3.fromRGB(100,100,100)
+            clone.Visible = true
+            clone.Parent = path
+
+            if name == "True Strength" and not requirements_text then
+                requirements_text = achievementLibraryModule["True Strenght"].Text
+            end
+
+            if not requirements_text then logs(`{name} dont have table. or is it error?`, true) end
+
+            runners[`HoverEnter_{name}`] = clone.MouseEnter:Connect(function()
+                HoverFrame:FindFirstChild("Title").Text = name
+                HoverFrame:FindFirstChild("Text1").Text = `Requirements: {formatRequirements(requirements_text or requirements)}`
+                HoverFrame:FindFirstChild("Text2").Text = `Unlocked Requirements: {formatRequirements(remain_requirements)}`
+
+                HoverFrame.Visible = true
+                logs("Button is being hovered!")
+            end)
+
+            runners[`HoverLeave_{name}`] = clone.MouseLeave:Connect(function()
+                HoverFrame.Visible = false
+                logs("Mouse left the button.")
+            end)
         end
+    else
+        for name,v in pairs(libraryModule) do
+            if not path:FindFirstChild(name) then continue end
+            if path:FindFirstChild(name).Written.Image ~= "rbxassetid://129898648862943" and not path:FindFirstChild(name):GetAttribute("Locked") then continue end
+            path:FindFirstChild(name):SetAttribute("Locked", true)
 
-        if not requirements_text then logs(`{name} dont have table. or is it error?`, true) end
+            local book_image = v.Illustration
 
-        runners[`HoverEnter_{name}`] = clone.MouseEnter:Connect(function()
-            HoverFrame:FindFirstChild("Title").Text = name
-            HoverFrame:FindFirstChild("Text1").Text = `Requirements: {formatRequirements(requirements_text or requirements)}`
-            HoverFrame:FindFirstChild("Text2").Text = `Unlocked Requirements: {formatRequirements(remain_requirements)}`
+            local function formatRequirements(tabl)
+                if typeof(tabl) == "string" then return tabl end
+                local parts = {}
+                for i, amount in pairs(tabl) do
+                    table.insert(parts, `{i} = {amount}`)
+                end
+                return table.concat(parts, ", ")
+            end
 
-            HoverFrame.Visible = true
-            logs("Button is being hovered!")
-        end)
+            local button = path:FindFirstChild(name)
+            button.Written.Image = book_image
+            button.Visible = true
+            button.Written.ImageColor3 = Color3.fromRGB(100,100,100)
 
-        runners[`HoverLeave_{name}`] = clone.MouseLeave:Connect(function()
-            HoverFrame.Visible = false
-            logs("Mouse left the button.")
-        end)
+            runners[`HoverEnter_{name}`] = button.MouseEnter:Connect(function()
+                if not HoverFrame:FindFirstChild("Title") then return end
+                if not HoverFrame:FindFirstChild("Text1") then return end
+                HoverFrame:FindFirstChild("Title").Text = name
+                HoverFrame:FindFirstChild("Text1").Size = UDim2.new(1,0,1,0)
+                HoverFrame:FindFirstChild("Text1").Text = `Requirements: Error information Module not exist`
+                HoverFrame.Visible = true
+            end)
+
+            runners[`HoverLeave_{name}`] = button.MouseLeave:Connect(function()
+                HoverFrame.Visible = false
+            end)
+        end
     end
 end
 
@@ -507,6 +563,30 @@ do
 
 		end
 
+		stats_frame = Instance.new("ScrollingFrame")
+		stats_frame.Active = true
+		stats_frame.Visible = false
+		stats_frame.BackgroundTransparency = .25
+		stats_frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		stats_frame.Position = UDim2.new(0.25, 0, 0.1, 0)
+		stats_frame.Size = UDim2.new(.75,0,0.9,0)
+		stats_frame.CanvasSize = UDim2.new(0,0,0,0)
+		stats_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		stats_frame.ScrollBarThickness = 0
+		stats_frame.Parent = main_frame
+		gui_module.UiStroke(stats_frame)
+
+		do
+			local grid = Instance.new("UIGridLayout")
+			grid.CellPadding = UDim2.new(0,0,0,1)
+			grid.CellSize = UDim2.new(1,0,.15,0)
+			grid.FillDirection = "Horizontal"
+			grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			grid.VerticalAlignment = Enum.VerticalAlignment.Top
+			grid.Parent = stats_frame
+
+        end
+
 		settings_frame = Instance.new("ScrollingFrame")
 		settings_frame.Active = true
 		settings_frame.Visible = false
@@ -541,9 +621,9 @@ do
 
             clawQTEDistanceToleranceButton = gui_module.create_frame(settings_frame, "Claw QTE Distance Tolerance", "how far the mouse will move distance of left and right of the Heart", clawQTEDistanceTolerance)
 
-            NormalDodgeDelayButton = gui_module.create_frame(settings_frame, "Dodge delay", "delay when dodge -second", configs.normalDodgeDelay)
+            NormalDodgeDelayButton = gui_module.create_frame(settings_frame, "Dodge delay", "How many senconds delay when the arrow detect change | second", configs.normalDodgeDelay)
 
-            DazeDodgeDelayButton = gui_module.create_frame(settings_frame, "Daze dodge delay", "delay when daze and dodge -second", configs.dazeDodgeDelay)
+            DazeDodgeDelayButton = gui_module.create_frame(settings_frame, "Daze dodge delay", "How many senconds delay when have Daze stats | second", configs.dazeDodgeDelay)
 			
             DodgeTypeButton = gui_module.create_frame(settings_frame, "Dodge type", "type of dodge you want to detect, detect by", "Click")
 			DodgeTypeButton.Text = configs.dodgeType
@@ -631,6 +711,8 @@ do
 
 			gui_module.create_button_catagory(catagories_frame, "Main", control_frame)
 
+            gui_module.create_button_catagory(catagories_frame, "Stats", stats_frame)
+
 			gui_module.create_button_catagory(catagories_frame, "Settings", settings_frame)
 
             gui_module.create_button_catagory(catagories_frame, "Features", features_frame)
@@ -677,6 +759,7 @@ do
     HoverFrame = Instance.new("Frame")
 	HoverFrame.Name = "Hover"
 	HoverFrame.Active = true
+    HoverFrame.Interactable = false
 	HoverFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 	HoverFrame.AnchorPoint = Vector2.new(0, 0)
 	HoverFrame.Position = UDim2.new(0, 0, 0.15, 0)
@@ -736,297 +819,224 @@ do
 end
 
 --Startup
-task.spawn(makeSpellButton)
-task.spawn(showUnlockedLibaryRequire)
-
-for _,v in pairs(workspace.Enemies:GetChildren()) do
-    track_animation(v)
-end
-
 runners.runner_checkScreen = rs.RenderStepped:Connect(function(dt)
     if not screen:IsDescendantOf(coregui) then onClose() end
 end)
 
-logs("active emergency close")
+logs("active automatic emergency close")
 
-runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
+task.spawn(makeSpellButton)
+task.spawn(showUnlockedLibaryRequire)
 
-    if child.Name == "ClickQTE" then
-        repeat task.wait() until child.Marker.Size.X.Offset <= child.Size.X.Offset - configs.clickQTETolerance
-        autoClickImage(child.Marker)
-    elseif child.Name == "ClickQTE_1" then
-        for i = 1,10 do
-            local current = plr.PlayerGui.PlayerGui:WaitForChild(`ClickQTE_{i}`, 1)
-            if not current then continue end
-            repeat task.wait() until current.Marker.Size.X.Offset <= current.Size.X.Offset - configs.clickQTETolerance
-            autoClickImage(current.Marker)
-        end
+if not isMainLobby then
+    for _,v in pairs(workspace.Enemies:GetChildren()) do
+        task.spawn(track_animation, v)
     end
-end)
 
-runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "MeterQTE" then return end
-
-    for i = 1,10 do
-        local slider = if i == 1 then child:WaitForChild("Marker") else child:WaitForChild("Marker"..i, 1)
-        if not slider then break end
-        
-        local crit_frame = child.Critical
-
-        local center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
-        local center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
-
-        local runner
-        runner = slider:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-            if not enable then if runner then runner:Disconnect() return end end
-            if not child:IsDescendantOf(plr.PlayerGui) then if runner then runner:Disconnect() return end end
-
-            center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
-            center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
-
-            if math.abs(center1.X - center2.X) <= crit_frame.AbsoluteSize.X/2 +configs.meterQTEExtraPixel then -- 5?
-                logs(`Attack! {center1} {center2} {math.abs(center1 - center2)}`)
-                autoClickImage(child)
-                if runner then runner:Disconnect() end
-            end
+    for _,v in pairs(plr.CoreStats:GetChildren()) do
+        if v:IsA("Folder") then continue end
+        local clone = gui_module.create_frame(stats_frame, v.Name, nil, "Click")
+        clone.Text = math.round(v.Value * 100) / 100
+        runners[`stats_{v.Name}`] = v.Changed:Connect(function()
+            clone.Text = math.round(v.Value * 100) / 100
         end)
     end
+end
 
-end)
+if configs.dodgeType == "AnimationTrack" then
+    DodgeInAdvanceButton.Visible = true
+    NormalDodgeDelayButton.Visible = false
+else
+    DodgeInAdvanceButton.Visible = false
+    NormalDodgeDelayButton.Visible = true
+end
 
-runners.runner_arrowQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "BullseyeBase" then return end
-    task.wait(.5)
-    autoClickImage(child)
-end)
+if not isMainLobby then
+    runners.runner_clickQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
 
-runners.runner_reactionQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "ReactionQTE" then return end
-
-    -- if not child.Image == "rbxassetid://88139127324893" then return end
-
-    while child:IsDescendantOf(plr.PlayerGui) do
-        repeat task.wait() until child.Image == "rbxassetid://86626625058805"
-        autoClickImage(child)
-        task.wait(.5)
-    end
-
-end)
-
-runners.runner_keyQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "KeyQte" then return end
-
-    local function rot_transform(rot)
-        return rot % 360
-    end
-
-    local spear = child.Spear
-    local ring1 = child.Ring2
-    local ring2 = child.Ring1
-
-    repeat task.wait() until ring1.ImageColor3 ~= Color3.fromRGB(255, 255, 255) and (rot_transform(ring1.Rotation) >= -10 and rot_transform(ring1.Rotation) <= 10)
-
-    autoClickImage(spear)
-
-    repeat task.wait() until ring2.ImageColor3 ~= Color3.fromRGB(85, 124, 148) and (rot_transform(ring2.Rotation) >= -10 and rot_transform(ring2.Rotation) <= 10)
-
-    autoClickImage(spear)
-
-end)
-
-runners.runner_backgroundMole = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "BackgroundMole" then return end
-
-    local inAssignment = {}
-
-    repeat
-        task.wait()
-        if not child:IsDescendantOf(plr.PlayerGui) then break end
-        for _,v in pairs(child:GetChildren()) do
-            local mole = v:FindFirstChild("Mole")
-            local spike = v:FindFirstChild("Spikeball")
-            if spike then
-                spike.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                spike.BackgroundTransparency = 0
-            elseif mole then
-                if inAssignment[mole] then continue end
-                inAssignment[mole] = true
-                autoClickImage(mole)
-                inAssignment[mole] = nil
-            else
-                v.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                v.BackgroundTransparency = 1
+        if child.Name == "ClickQTE" then
+            repeat task.wait() until child.Marker.Size.X.Offset <= child.Size.X.Offset - configs.clickQTETolerance
+            autoClickImage(child.Marker)
+        elseif child.Name == "ClickQTE_1" then
+            for i = 1,10 do
+                local current = plr.PlayerGui.PlayerGui:WaitForChild(`ClickQTE_{i}`, 1)
+                if not current then continue end
+                repeat task.wait() until current.Marker.Size.X.Offset <= current.Size.X.Offset - configs.clickQTETolerance
+                autoClickImage(current.Marker)
             end
         end
-    until not child:IsDescendantOf(plr.PlayerGui) or not enable
+    end)
 
-    inAssignment = {}
+    runners.runner_meterQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "MeterQTE" then return end
 
-end)
+        for i = 1,10 do
+            local slider = if i == 1 then child:WaitForChild("Marker") else child:WaitForChild("Marker"..i, 1)
+            if not slider then break end
+            
+            local crit_frame = child.Critical
 
-runners.runner_rapierQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "RapierQte" then return end
+            local center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
+            local center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
 
-    local inAssignment = {}
+            local runner
+            runner = slider:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+                if not enable then if runner then runner:Disconnect() return end end
+                if not child:IsDescendantOf(plr.PlayerGui) then if runner then runner:Disconnect() return end end
 
-    task.wait(.5)
+                center1 = slider.AbsolutePosition + slider.AbsoluteSize / 2
+                center2 = crit_frame.AbsolutePosition + crit_frame.AbsoluteSize / 2
 
-    for _,marker in pairs(child:GetChildren()) do
-        if inAssignment[marker] then continue end
-        inAssignment[marker] = true
-
-        autoClickImage(marker)
-        
-        task.wait(.1)
-    end
-
-    inAssignment = {}
-
-end)
-
-runners.runner_chopQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "ChopQTE" then return end
-
-    repeat
-        for _,v in pairs(child.Tree:GetChildren()) do
-            if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
-
-            if v.Position == UDim2.new(.5, 0, 1, -child.Tree.Position.Y.Offset) then
-                if v.Image == "rbxassetid://135975182333045" then
-                    if v.ImageRectSize == Vector2.new(348, 192) then --A imageRectOffset == 0
-                        press_key("A")
-                    elseif v.ImageRectSize == Vector2.new(-348, 192) then --D ImageRectOffset == 348
-                        press_key("D")
-                    end
-                elseif v.Image == "rbxassetid://99365434243772" then
-                    logs("Chop top")
-                    local k = {"A", "D"}
-                    local r = k[math.random(1, #k)]
-                    press_key(r)
-                else
-                    continue
+                if math.abs(center1.X - center2.X) <= crit_frame.AbsoluteSize.X/2 +configs.meterQTEExtraPixel then -- 5?
+                    logs(`Attack! {center1} {center2} {math.abs(center1 - center2)}`)
+                    autoClickImage(child)
+                    if runner then runner:Disconnect() end
                 end
-                task.wait(.075)
-            end
+            end)
         end
+
+    end)
+
+    runners.runner_arrowQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "BullseyeBase" then return end
         task.wait(.5)
-    until not child:IsDescendantOf(plr.PlayerGui) or not enable
-end)
+        autoClickImage(child)
+    end)
 
-runners.runner_clawHeartQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "ClawHeartQTE" then return end
+    runners.runner_reactionQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "ReactionQTE" then return end
 
-    local heart = child:WaitForChild("HeartQte")
-    local inset = gs:GetGuiInset()
+        -- if not child.Image == "rbxassetid://88139127324893" then return end
 
-    local start_t = time()
-
-    repeat
-        local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
-        local left = heart.AbsolutePosition.X - clawQTEDistanceTolerance
-        local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + clawQTEDistanceTolerance
-
-        if Logs then
-            local hitbox = Instance.new("Frame")
-            hitbox.Size = UDim2.fromOffset(10, 10)
-            hitbox.AnchorPoint = Vector2.new(.5,.5)
-            hitbox.Position = UDim2.fromOffset(center.X, center.Y)
-            hitbox.Parent = screen
-            game.Debris:AddItem(hitbox, 2)
+        while child:IsDescendantOf(plr.PlayerGui) do
+            repeat task.wait() until child.Image == "rbxassetid://86626625058805"
+            autoClickImage(child)
+            task.wait(.5)
         end
 
-        vim:SendMouseMoveEvent(left, center.Y+inset.Y, game)
-        task.wait(configs.clawQTESpeed)
-        vim:SendMouseMoveEvent(right, center.Y+inset.Y, game)
-        task.wait(configs.clawQTESpeed)
-    until not child:IsDescendantOf(plr.PlayerGui)
+    end)
 
-    logs(`End in {time()-start_t} second`)
+    runners.runner_keyQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "KeyQte" then return end
 
-end)
-
-runners.runner_clawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if true then return end
-    if not enable then return end
-    if child.Name ~= "ClawHeartSpikeQTE" then return end
-
-    local heart = child:WaitForChild("HeartQte")
-    local spike = child:WaitForChild("SpikeBall_2")
-    local inset = gs:GetGuiInset()
-
-    local start_t = time()
-
-    repeat
-        local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
-        local left = heart.AbsolutePosition.X - (heart.AbsoluteSize.X/2) - clawQTEDistanceTolerance
-        local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X - clawQTEDistanceTolerance
-
-        if Logs then
-            local hitbox = Instance.new("Frame")
-            hitbox.Size = UDim2.fromOffset(10, 10)
-            hitbox.AnchorPoint = Vector2.new(.5,.5)
-            hitbox.Position = UDim2.fromOffset(center.X, center.Y)
-            hitbox.Parent = screen
-            game.Debris:AddItem(hitbox, 2)
+        local function rot_transform(rot)
+            return rot % 360
         end
 
-        -- if isMouseNearImage(spike, 10, Vector2.new(left, center.Y)) then task.wait(wait_t) continue end
-        vim:SendMouseMoveEvent(left, center.Y+inset.Y, game)
-        task.wait(configs.clawQTESpeed)
-        -- if isMouseNearImage(spike, 10, Vector2.new(right, center.Y)) then task.wait(wait_t) continue end
-        vim:SendMouseMoveEvent(right, center.Y+inset.Y, game)
-        task.wait(configs.clawQTESpeed)
-    until not child:IsDescendantOf(plr.PlayerGui)
+        local spear = child.Spear
+        local ring1 = child.Ring2
+        local ring2 = child.Ring1
 
-    logs(`Claw Spike QTE End in {time()-start_t} second`)
+        repeat task.wait() until ring1.ImageColor3 ~= Color3.fromRGB(255, 255, 255) and (rot_transform(ring1.Rotation) >= -10 and rot_transform(ring1.Rotation) <= 10)
 
-end)
+        autoClickImage(spear)
 
-runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "MultiClawHeartQTE" then return end
+        repeat task.wait() until ring2.ImageColor3 ~= Color3.fromRGB(85, 124, 148) and (rot_transform(ring2.Rotation) >= -10 and rot_transform(ring2.Rotation) <= 10)
 
-    local inset = gs:GetGuiInset()
-    local start_t = time()
+        autoClickImage(spear)
 
-    local function get_heart(number)
-        local heart = child:FindFirstChild(`Heart_{number}`)
-        if heart and heart:FindFirstChild("HeartHealth").Text == "0" then
-            number = number+1
-            heart, number = get_heart(number)
+    end)
+
+    runners.runner_backgroundMole = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "BackgroundMole" then return end
+
+        local inAssignment = {}
+
+        repeat
+            task.wait()
+            if not child:IsDescendantOf(plr.PlayerGui) then break end
+            for _,v in pairs(child:GetChildren()) do
+                local mole = v:FindFirstChild("Mole")
+                local spike = v:FindFirstChild("Spikeball")
+                if spike then
+                    spike.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                    spike.BackgroundTransparency = 0
+                elseif mole then
+                    if inAssignment[mole] then continue end
+                    inAssignment[mole] = true
+                    autoClickImage(mole)
+                    inAssignment[mole] = nil
+                else
+                    v.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    v.BackgroundTransparency = 1
+                end
+            end
+        until not child:IsDescendantOf(plr.PlayerGui) or not enable
+
+        inAssignment = {}
+
+    end)
+
+    runners.runner_rapierQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "RapierQte" then return end
+
+        local inAssignment = {}
+
+        task.wait(.5)
+
+        for _,marker in pairs(child:GetChildren()) do
+            if inAssignment[marker] then continue end
+            inAssignment[marker] = true
+
+            autoClickImage(marker)
+            
+            task.wait(.1)
         end
-        return heart, number
-    end
 
-    for i = 1,10 do
-        local heart, n = get_heart(i)
-        local heart2 = get_heart(n+1)
-        if not heart then continue end
+        inAssignment = {}
 
-        logs(`Heart1: {heart} | Heart2: {heart2}`)
+    end)
+
+    runners.runner_chopQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "ChopQTE" then return end
+
+        repeat
+            for _,v in pairs(child.Tree:GetChildren()) do
+                if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
+
+                if v.Position == UDim2.new(.5, 0, 1, -child.Tree.Position.Y.Offset) then
+                    if v.Image == "rbxassetid://135975182333045" then
+                        if v.ImageRectSize == Vector2.new(348, 192) then --A imageRectOffset == 0
+                            press_key("A")
+                        elseif v.ImageRectSize == Vector2.new(-348, 192) then --D ImageRectOffset == 348
+                            press_key("D")
+                        end
+                    elseif v.Image == "rbxassetid://99365434243772" then
+                        logs("Chop top")
+                        local k = {"A", "D"}
+                        local r = k[math.random(1, #k)]
+                        press_key(r)
+                    else
+                        continue
+                    end
+                    task.wait(.075)
+                end
+            end
+            task.wait(.5)
+        until not child:IsDescendantOf(plr.PlayerGui) or not enable
+    end)
+
+    runners.runner_clawHeartQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "ClawHeartQTE" then return end
+
+        local heart = child:WaitForChild("HeartQte")
+        local inset = gs:GetGuiInset()
+
+        local start_t = time()
 
         repeat
             local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
             local left = heart.AbsolutePosition.X - clawQTEDistanceTolerance
             local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + clawQTEDistanceTolerance
-            local left2
-            local right2
-            local center2
-
-            if heart2 then
-                center2 = heart2.AbsolutePosition + heart2.AbsoluteSize / 2
-                left2 = heart2.AbsolutePosition.X - clawQTEDistanceTolerance
-                right2 = heart2.AbsolutePosition.X + heart2.AbsoluteSize.X + clawQTEDistanceTolerance
-            end
 
             if Logs then
                 local hitbox = Instance.new("Frame")
@@ -1037,302 +1047,404 @@ runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").
                 game.Debris:AddItem(hitbox, 2)
             end
 
-            vim:SendMouseMoveEvent(center.X, center.Y+inset.Y, game)
+            vim:SendMouseMoveEvent(left, center.Y+inset.Y, game)
             task.wait(configs.clawQTESpeed)
-            if heart2 then vim:SendMouseMoveEvent(center2.X, center2.Y+inset.Y, game) else vim:SendMouseMoveEvent(right, center.Y+inset.Y, game) end
+            vim:SendMouseMoveEvent(right, center.Y+inset.Y, game)
             task.wait(configs.clawQTESpeed)
-        until not child:IsDescendantOf(plr.PlayerGui) or not heart:IsDescendantOf(plr.PlayerGui) or heart.HeartHealth.Text == "0"
-    end
+        until not child:IsDescendantOf(plr.PlayerGui)
 
-    logs(`Multi Claw QTE End in {time()-start_t} second`)
+        logs(`End in {time()-start_t} second`)
 
-end)
+    end)
 
-runners.runner_checkNew = plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame.ChildAdded:Connect(function(child)
-    if not plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`)  then return end
-    if runners[`HoverEnter_{child.Name}`] then runners[`HoverEnter_{child.Name}`]:Disconnect() end
-    if runners[`HoverLeave_{child.Name}`] then runners[`HoverLeave_{child.Name}`]:Disconnect() end
-    plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`):Destroy()
-end)
+    runners.runner_clawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "ClawHeartSpikeQTE" then return end
 
-runners.runner_checkRunes = plr.PlayerGui:WaitForChild("LibraryStats").SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame.ChildAdded:Connect(function(child)
-    makeSpellButton()
-end)
+        local heart = child:WaitForChild("HeartQte")
+        local spike = child:WaitForChild("SpikeBall_2")
+        local inset = gs:GetGuiInset()
 
-runners.runner_spellRunes = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "Runesight" then return end
+        local start_t = time()
 
-    makeSpellButton()
+        repeat
+            local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
+            local left = heart.AbsolutePosition.X - (heart.AbsoluteSize.X/2) - clawQTEDistanceTolerance
+            local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X - clawQTEDistanceTolerance
 
-    if not next(selectedSpell) then
-        repeat task.wait() until next(selectedSpell) or not child:IsDescendantOf(plr.PlayerGui)
-        -- selectedSpell = unlockedSpells[math.random(1, #unlockedSpells)]
+            if Logs then
+                local hitbox = Instance.new("Frame")
+                hitbox.Size = UDim2.fromOffset(10, 10)
+                hitbox.AnchorPoint = Vector2.new(.5,.5)
+                hitbox.Position = UDim2.fromOffset(center.X, center.Y)
+                hitbox.Parent = screen
+                game.Debris:AddItem(hitbox, 2)
+            end
+
+            -- if isMouseNearImage(spike, 10, Vector2.new(left, center.Y)) then task.wait(wait_t) continue end
+            vim:SendMouseMoveEvent(left, center.Y+inset.Y, game)
+            task.wait(configs.clawQTESpeed)
+            -- if isMouseNearImage(spike, 10, Vector2.new(right, center.Y)) then task.wait(wait_t) continue end
+            vim:SendMouseMoveEvent(right, center.Y+inset.Y, game)
+            task.wait(configs.clawQTESpeed)
+        until not child:IsDescendantOf(plr.PlayerGui)
+
+        logs(`Claw Spike QTE End in {time()-start_t} second`)
+
+    end)
+
+    runners.runner_multiClawHeartSpikeQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "MultiClawHeartQTE" then return end
+
+        local inset = gs:GetGuiInset()
+        local start_t = time()
+
+        local function get_heart(number)
+            local heart = child:FindFirstChild(`Heart_{number}`)
+            if heart and heart:FindFirstChild("HeartHealth").Text == "0" then
+                number = number+1
+                heart, number = get_heart(number)
+            end
+            return heart, number
+        end
+
+        for i = 1,10 do
+            local heart, n = get_heart(i)
+            local heart2, nn = get_heart(n+1)
+            if not heart then continue end
+
+            logs(`Heart1: {heart} | Heart2: {heart2}`)
+
+            repeat
+                local center = heart.AbsolutePosition + heart.AbsoluteSize / 2
+                local left = heart.AbsolutePosition.X - clawQTEDistanceTolerance
+                local right = heart.AbsolutePosition.X + heart.AbsoluteSize.X + clawQTEDistanceTolerance
+                local left2
+                local right2
+                local center2
+
+                if heart2 then
+                    if heart2.HeartHealth.Text == "0" then
+                        heart2 = get_heart(nn)
+                    end
+                    if heart2 then
+                        center2 = heart2.AbsolutePosition + heart2.AbsoluteSize / 2
+                        left2 = heart2.AbsolutePosition.X - clawQTEDistanceTolerance
+                        right2 = heart2.AbsolutePosition.X + heart2.AbsoluteSize.X + clawQTEDistanceTolerance
+                    end
+                end
+
+                if Logs then
+                    local hitbox = Instance.new("Frame")
+                    hitbox.Size = UDim2.fromOffset(10, 10)
+                    hitbox.AnchorPoint = Vector2.new(.5,.5)
+                    hitbox.Position = UDim2.fromOffset(center.X, center.Y)
+                    hitbox.Parent = screen
+                    game.Debris:AddItem(hitbox, 2)
+                end
+
+                vim:SendMouseMoveEvent(center.X, center.Y+inset.Y, game)
+                task.wait(configs.clawQTESpeed)
+                if heart2 then vim:SendMouseMoveEvent(center2.X, center2.Y+inset.Y, game) else vim:SendMouseMoveEvent(right, center.Y+inset.Y, game) end
+                task.wait(configs.clawQTESpeed)
+            until not child:IsDescendantOf(plr.PlayerGui) or not heart:IsDescendantOf(plr.PlayerGui) or heart.HeartHealth.Text == "0"
+        end
+
+        logs(`Multi Claw QTE End in {time()-start_t} second`)
+
+    end)
+
+    runners.runner_checkNew = plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame.ChildAdded:Connect(function(child)
+        if not plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`)  then return end
+        if runners[`HoverEnter_{child.Name}`] then runners[`HoverEnter_{child.Name}`]:Disconnect() end
+        if runners[`HoverLeave_{child.Name}`] then runners[`HoverLeave_{child.Name}`]:Disconnect() end
+        plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:FindFirstChild(`{child.Name}_Holder`):Destroy()
+    end)
+
+    runners.runner_checkRunes = plr.PlayerGui:WaitForChild("LibraryStats").SkillLibrary.CoreStats.SpellsButton.Background.ScrollingFrame.ChildAdded:Connect(function(child)
+        makeSpellButton()
+    end)
+
+    runners.runner_spellRunes = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "Runesight" then return end
+
+        makeSpellButton()
+
+        if not next(selectedSpell) then
+            repeat task.wait() until next(selectedSpell) or not child:IsDescendantOf(plr.PlayerGui)
+            -- selectedSpell = unlockedSpells[math.random(1, #unlockedSpells)]
+            if not child:IsDescendantOf(plr.PlayerGui) then return end
+        end
+
+        local lists = {}
+        local howMany = 0
+
+        for _,v in pairs(child.RuneList:GetChildren()) do
+            if not v:IsA("ImageLabel") then continue end
+            howMany += 1
+        end
+
+        local function insert_spell(name, amount)
+            for i = 1,amount do
+                table.insert(lists, name)
+                howMany -= 1
+            end
+        end
+
+        if spellsModule[selectedSpell.Name] then
+            local spell = spellsModule[selectedSpell.Name]
+
+            if spell.Fire then
+                insert_spell("Fire", spell.Fire)
+            end
+
+            if spell.Water then
+                insert_spell("Water", spell.Water)
+            end
+
+            if spell.Wind then
+                insert_spell("Wind", spell.Wind)
+            end
+
+            if spell.Earth then
+                insert_spell("Earth", spell.Earth)
+            end
+
+            if spell.Chaos then
+                insert_spell("Chaos", spell.Chaos)
+            end
+
+            if spell.Void then
+                insert_spell("Void", spell.Void)
+            end
+
+            if spell.Order then
+                insert_spell("Order", spell.Order)
+            end
+        end
+
+        if howMany ~= 0 and selectedSpell.isMax then
+            if howMany > spellsModule[selectedSpell.Name].MaxIncrease then
+                insert_spell(spellsModule[selectedSpell.Name].Increase, spellsModule[selectedSpell.Name].MaxIncrease)
+            else
+                insert_spell(spellsModule[selectedSpell.Name].Increase, howMany)
+            end
+            howMany = 0
+        end
+
+        for _,rune_name in pairs(lists) do
+            if not child:IsDescendantOf(plr.PlayerGui) then break end
+            local button = child.RuneInCircle:FindFirstChild(rune_name.."RuneButton")
+            if button then
+                autoClickImage(button)
+            end
+            task.wait(.5)
+        end
+
         if not child:IsDescendantOf(plr.PlayerGui) then return end
-    end
+        if not next(lists) then return end
+        autoClickImage(child.CastButton)
 
-    local lists = {}
-    local howMany = 0
+    end)
 
-    for _,v in pairs(child.RuneList:GetChildren()) do
-        if not v:IsA("ImageLabel") then continue end
-        howMany += 1
-    end
+    local pressing = false
+    runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChild("Visuals"):GetPropertyChangedSignal("Visible"):Connect(function()
+        if not enable then return end
+        if not plr.PlayerGui.PlayerGui.Visuals.Visible then return end
 
-    local function insert_spell(name, amount)
-        for i = 1,amount do
-            table.insert(lists, name)
-            howMany -= 1
-        end
-    end
-
-    if spellsModule[selectedSpell.Name] then
-        local spell = spellsModule[selectedSpell.Name]
-
-        if spell.Fire then
-            insert_spell("Fire", spell.Fire)
-        end
-
-        if spell.Water then
-            insert_spell("Water", spell.Water)
-        end
-
-        if spell.Wind then
-            insert_spell("Wind", spell.Wind)
-        end
-
-        if spell.Earth then
-            insert_spell("Earth", spell.Earth)
-        end
-
-        if spell.Chaos then
-            insert_spell("Chaos", spell.Chaos)
-        end
-
-        if spell.Void then
-            insert_spell("Void", spell.Void)
-        end
-
-        if spell.Order then
-            insert_spell("Order", spell.Order)
-        end
-    end
-
-    if howMany ~= 0 and selectedSpell.isMax then
-        if howMany > spellsModule[selectedSpell.Name].MaxIncrease then
-            insert_spell(spellsModule[selectedSpell.Name].Increase, spellsModule[selectedSpell.Name].MaxIncrease)
-        else
-            insert_spell(spellsModule[selectedSpell.Name].Increase, howMany)
-        end
-        howMany = 0
-    end
-
-    for _,rune_name in pairs(lists) do
-		if not child:IsDescendantOf(plr.PlayerGui) then break end
-        local button = child.RuneInCircle:FindFirstChild(rune_name.."RuneButton")
-        if button then
-            autoClickImage(button)
-        end
-        task.wait(.5)
-    end
-
-    if not child:IsDescendantOf(plr.PlayerGui) then return end
-    if not next(lists) then return end
-    autoClickImage(child.CastButton)
-
-end)
-
-local pressing = false
-runners.runner_dodgeArrow = plr.PlayerGui:WaitForChild("PlayerGui"):FindFirstChild("Visuals"):GetPropertyChangedSignal("Visible"):Connect(function()
-    if not enable then return end
-    if not plr.PlayerGui.PlayerGui.Visuals.Visible then return end
-
-	local target__ori_size = UDim2.fromScale(0.8, 0.8)
-	local target_size = UDim2.fromScale(1.5, 1.5)
-    local target_color_green = Color3.fromRGB(76, 255, 26)
-    local target_color_red = Color3.fromRGB(140, 30, 30)
-    
-    for _,v in pairs(plr.PlayerGui.PlayerGui.Visuals:GetChildren()) do
-        if not dodgeAssignments[`{v.Name}Size`] then
-            local isbig = false
-            local issmall = true
-            dodgeAssignments[`{v.Name}Size`] = v:GetPropertyChangedSignal("Size"):Connect(function()
-                if not enable then return end
-                if pressing then return end
-                if not configs.dodgeType == "ArrowSize" then return end
-                
-                local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
-                local is_daze = daze_stat.Visible
-                local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+        local target__ori_size = UDim2.fromScale(0.8, 0.8)
+        local target_size = UDim2.fromScale(1.5, 1.5)
+        local target_color_green = Color3.fromRGB(76, 255, 26)
+        local target_color_red = Color3.fromRGB(140, 30, 30)
+        
+        for _,v in pairs(plr.PlayerGui.PlayerGui.Visuals:GetChildren()) do
+            if not dodgeAssignments[`{v.Name}Size`] then
+                local isbig = false
+                local issmall = true
+                dodgeAssignments[`{v.Name}Size`] = v:GetPropertyChangedSignal("Size"):Connect(function()
+                    if not enable then return end
+                    if pressing then return end
+                    if configs.dodgeType ~= "ArrowSize" and configs.dodgeType ~= "AnimationTrack" then return end
                     
-                local scale = (v.Size.X.Scale + v.Size.Y.Scale) / 2
+                    local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
+                    local is_daze = daze_stat.Visible
+                    local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+                        
+                    local scale = (v.Size.X.Scale + v.Size.Y.Scale) / 2
 
-                if scale >= 1.25 and issmall then
-                    isbig = true
-                    issmall = false
+                    if scale >= 1.25 and issmall then
+                        isbig = true
+                        issmall = false
 
-                    pressing = true
-                    key = v.TextLabel.Text
-                    if is_daze then task.wait(configs.dazeDodgeDelay) else task.wait(configs.normalDodgeDelay) end
-                    logs(`Dodge! {key}`)
-                    press_key(key)
-                    pressing = false
-                elseif scale <= 1 then
-                    issmall = true
-                    isbig = false
-                end
-            end)
-        elseif not dodgeAssignments[`{v.Name}Color`] then
-            local isgreen = false
-            local isred = true
-            dodgeAssignments[`{v.Name}Color`] = v:GetPropertyChangedSignal("ImageColor3"):Connect(function()
-                if not enable then return end
-                if pressing then return end
-                if not configs.dodgeType == "ArrowColor" then return end
-                
-                local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
-                local is_daze = daze_stat.Visible
-                local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
+                        pressing = true
+                        key = v.TextLabel.Text
+                        if is_daze then task.wait(configs.dazeDodgeDelay) else task.wait(configs.normalDodgeDelay) end
+                        logs(`Dodge! {key}`)
+                        press_key(key)
+                        pressing = false
+                    elseif scale <= 1 then
+                        issmall = true
+                        isbig = false
+                    end
+                end)
+            elseif not dodgeAssignments[`{v.Name}Color`] then
+                local isgreen = false
+                local isred = true
+                dodgeAssignments[`{v.Name}Color`] = v:GetPropertyChangedSignal("ImageColor3"):Connect(function()
+                    if not enable then return end
+                    if pressing then return end
+                    if configs.dodgeType ~= "ArrowColor" and configs.dodgeType ~= "AnimationTrack" then return end
+                    
+                    local daze_stat = plr.PlayerGui.PlayerGui.StatBar.Statuses.Daze
+                    local is_daze = daze_stat.Visible
+                    local dodge_timing = if is_daze then .175 else .175 --then .2 else .175
 
-                local current = v.ImageColor3
-                local distance_from_green = math.sqrt(
-                    (current.R - target_color_green.R)^2 +
-                    (current.G - target_color_green.G)^2 +
-                    (current.B - target_color_green.B)^2
-                )
+                    local current = v.ImageColor3
+                    local distance_from_green = math.sqrt(
+                        (current.R - target_color_green.R)^2 +
+                        (current.G - target_color_green.G)^2 +
+                        (current.B - target_color_green.B)^2
+                    )
 
-                local distance_from_red = math.sqrt(
-                    (current.R - target_color_red.R)^2 +
-                    (current.G - target_color_red.G)^2 +
-                    (current.B - target_color_red.B)^2
-                )
+                    local distance_from_red = math.sqrt(
+                        (current.R - target_color_red.R)^2 +
+                        (current.G - target_color_red.G)^2 +
+                        (current.B - target_color_red.B)^2
+                    )
 
-                if distance_from_green < dodge_timing and not isgreen and isred then
-                    isred = false
-                    isgreen = true
-                    pressing = true
-                    key = v.TextLabel.Text
-                    if is_daze then task.wait(configs.dazeDodgeDelay) else task.wait(configs.normalDodgeDelay) end
-                    logs(`Dodge! {key}`)
-                    press_key(key)
-                    pressing = false
-                elseif distance_from_red < .3 and not isred and isgreen then
-                    isred = true
-                    isgreen = false
-                end
-            end)
-        else
-            continue
-        end
-    end
-
-end)
-
-runners.runner_restrainQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "RestrainQTE" then return end
-
-    for _,v in pairs(child:GetChildren()) do
-        if not v:IsA("ImageLabel") then continue end
-
-        local key = v.Name:match("_(%a+)$")
-
-        press_key(key)
-        task.wait(.25)
-    end
-
-end)
-
-runners.runner_soulKillerHeart = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
-    if child.Name ~= "SoulkillerHearts" then return end
-    
-    local goods = {
-        "Im breaking but im still here...";
-        "Theres still something left in me...";
-        "I know who I am.";
-        "Its not the end yet...";
-        "I must ignore those voices...";
-        "Im so tired but I cant give in...";
-    }
-
-    repeat
-        for _,v in pairs(plr.PlayerGui.PlayerGui:GetChildren()) do
-            if not v:IsA("TextLabel") then continue end
-            local text = v.Text
-            if table.find(goods, text) then
-                press_key("Space")
+                    if distance_from_green < dodge_timing and not isgreen and isred then
+                        isred = false
+                        isgreen = true
+                        pressing = true
+                        key = v.TextLabel.Text
+                        if is_daze then task.wait(configs.dazeDodgeDelay) else task.wait(configs.normalDodgeDelay) end
+                        logs(`Dodge! {key}`)
+                        press_key(key)
+                        pressing = false
+                    elseif distance_from_red < .3 and not isred and isgreen then
+                        isred = true
+                        isgreen = false
+                    end
+                end)
             else
                 continue
             end
         end
-        task.wait(1)
-    until not child:IsDescendantOf(plr.PlayerGui) or not enable
 
-end)
+    end)
 
-runners.runner_mining = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
-    if not enable then return end
+    runners.runner_restrainQte = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "RestrainQTE" then return end
 
-    if child.Name ~= "RockminigameQTE" then return end
-    local CountdownLabel = child:WaitForChild("CountdownLabel")
+        for _,v in pairs(child:GetChildren()) do
+            if not v:IsA("ImageLabel") then continue end
 
-    repeat task.wait() until not CountdownLabel:IsDescendantOf(child) or CountdownLabel.Text == "MINE!"
-	task.wait(.1)
-	repeat task.wait() until CountdownLabel.TextTransparency == 1
+            local key = v.Name:match("_(%a+)$")
 
-    local rocks = {}
-    local break_rocks = {}
-
-    logs("Start mining!")
-
-    local function checkStone(obj)
-        if obj.Image == "rbxassetid://85970625997038" then --break
-            autoClickImage(obj)
-            task.wait(.25)
-        elseif obj.Image == "rbxassetid://112215877321999" then --rocks
-            autoClickImage(obj)
+            press_key(key)
             task.wait(.25)
         end
-    end
 
-    repeat
-        for _,v in pairs(child:WaitForChild("Frame"):GetChildren()) do
-            if not enable then break end
-            if not child:IsDescendantOf(plr.PlayerGui) then break end
-            if not v:IsA("ImageLabel") then continue end
-            if v:GetAttribute("IsEmpty") == true then continue end
+    end)
 
-            if v.Image == "rbxassetid://85970625997038" then --break
-                rocks[v] = 1
-            elseif v.Image == "rbxassetid://112215877321999" then --rocks
-                rocks[v] = 2
-            else
-                if rocks[v] then rocks[v] = nil end
+    runners.runner_soulKillerHeart = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+        if child.Name ~= "SoulkillerHearts" then return end
+        
+        local goods = {
+            "Im breaking but im still here...";
+            "Theres still something left in me...";
+            "I know who I am.";
+            "Its not the end yet...";
+            "I must ignore those voices...";
+            "Im so tired but I cant give in...";
+        }
+
+        repeat
+            for _,v in pairs(plr.PlayerGui.PlayerGui:GetChildren()) do
+                if not v:IsA("TextLabel") then continue end
+                local text = v.Text
+                if table.find(goods, text) then
+                    press_key("Space")
+                else
+                    continue
+                end
+            end
+            task.wait(1)
+        until not child:IsDescendantOf(plr.PlayerGui) or not enable
+
+    end)
+
+    runners.runner_mining = plr.PlayerGui:WaitForChild("PlayerGui").ChildAdded:Connect(function(child)
+        if not enable then return end
+
+        if child.Name ~= "RockminigameQTE" then return end
+        local CountdownLabel = child:WaitForChild("CountdownLabel")
+
+        repeat task.wait() until not CountdownLabel:IsDescendantOf(child) or CountdownLabel.Text == "MINE!"
+        task.wait(.1)
+        repeat task.wait() until CountdownLabel.TextTransparency == 1
+
+        local rocks = {}
+        local break_rocks = {}
+
+        logs("Start mining!")
+
+        local function checkStone(obj)
+            if obj.Image == "rbxassetid://85970625997038" then --break
+                autoClickImage(obj)
+                task.wait(.25)
+            elseif obj.Image == "rbxassetid://112215877321999" then --rocks
+                autoClickImage(obj)
+                task.wait(.25)
             end
         end
 
-        table.sort(rocks, function(a,b) return a < b end)
+        repeat
+            for _,v in pairs(child:WaitForChild("Frame"):GetChildren()) do
+                if not enable then break end
+                if not child:IsDescendantOf(plr.PlayerGui) then break end
+                if not v:IsA("ImageLabel") then continue end
+                if v:GetAttribute("IsEmpty") == true then continue end
 
-        for i,v in pairs(rocks) do
-            if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
-            checkStone(i)
-            checkStone(i)
-        end
+                if v.Image == "rbxassetid://85970625997038" then --break
+                    rocks[v] = 1
+                elseif v.Image == "rbxassetid://112215877321999" then --rocks
+                    rocks[v] = 2
+                else
+                    if rocks[v] then rocks[v] = nil end
+                end
+            end
 
-        task.wait()
-    until not child:IsDescendantOf(plr.PlayerGui)
+            table.sort(rocks, function(a,b) return a < b end)
 
-end)
+            for i,v in pairs(rocks) do
+                if not child:IsDescendantOf(plr.PlayerGui) or not enable then break end
+                checkStone(i)
+                checkStone(i)
+            end
+
+            task.wait()
+        until not child:IsDescendantOf(plr.PlayerGui)
+
+    end)
+end
 
 runners.runner_workspace = workspace.ChildAdded:Connect(function(child)
-    if child.Name == "RootVFX" then track_animation(child) end
+    if child.Name == "RootVFX" then task.spawn(track_animation, child) end
+    if child.Name == "TectonicCall" then task.spawn(track_animation, child) end
+    logs(child.Name)
 end)
 
-runners.runner_logsTrackAnimation = workspace.Enemies.ChildAdded:Connect(function(child)
-    if not child:FindFirstChildOfClass("Humanoid") then return end
-    track_animation(child)
-end)
+if not isMainLobby then
+    runners.runner_logsTrackAnimation = workspace.Enemies.ChildAdded:Connect(function(child)
+        if not child:FindFirstChildOfClass("Humanoid") then return end
+        task.spawn(track_animation, child)
+    end)
+end
 
 colorstatus.Activated:Connect(function()
     enable = not enable
@@ -1342,15 +1454,7 @@ end)
 ShowLibraryButton.Activated:Connect(function()
     showLibrary = not showLibrary
     ShowLibraryButton.BackgroundColor3 = if showLibrary then truecolor else falsecolor
-
-    if showLibrary then
-        task.spawn(showUnlockedLibaryRequire)
-    else
-        for _,v in plr.PlayerGui.LibraryStats.SkillLibrary.UnlockedShelf.ScrollingFrame:GetChildren() do
-            if string.sub(v.Name, -7) == "_Holder" then v:Destroy() end
-        end
-    end
-
+    task.spawn(showUnlockedLibaryRequire)
 end)
 
 FullBrightMapButton.Activated:Connect(function()
@@ -1429,6 +1533,14 @@ DodgeTypeButton.Activated:Connect(function()
     local current = table.find(dodgeTypes, configs.dodgeType)
     configs.dodgeType = dodgeTypes[(current % #dodgeTypes) + 1]
 	DodgeTypeButton.Text = configs.dodgeType
+
+    if configs.dodgeType == "AnimationTrack" then
+        DodgeInAdvanceButton.Visible = true
+        NormalDodgeDelayButton.Visible = false
+    else
+        DodgeInAdvanceButton.Visible = false
+        NormalDodgeDelayButton.Visible = true
+    end
 end)
 
 DevModeButton.Activated:Connect(function()
